@@ -1,0 +1,27 @@
+{
+  "name": "@mev-research/main",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "@mev-research/shared": "workspace:*",
+    "@mev-research/execution": "workspace:*",
+    "@mev-research/database": "workspace:*",
+    "@mev-research/market-feed": "workspace:*",
+    "@mev-research/spread-engine": "workspace:*",
+    "@mev-research/simulation": "workspace:*",
+    "@mev-research/analytics": "workspace:*",
+    "@mev-research/telegram": "workspace:*",
+    "@mev-research/api": "workspace:*",
+    "@mev-research/monitoring": "workspace:*",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

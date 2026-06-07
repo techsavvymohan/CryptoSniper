@@ -1,0 +1,22 @@
+{
+  "name": "@mev-research/database",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "migrate": "ts-node src/migrate.ts"
+  },
+  "dependencies": {
+    "@mev-research/shared": "workspace:*",
+    "dotenv": "^16.6.1",
+    "ioredis": "^5.3.2",
+    "pg": "^8.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/pg": "^8.11.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

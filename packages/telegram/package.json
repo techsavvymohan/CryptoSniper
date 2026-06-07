@@ -1,0 +1,21 @@
+﻿{
+    "name":  "@mev-research/telegram",
+    "version":  "1.0.0",
+    "main":  "dist/index.js",
+    "types":  "dist/index.d.ts",
+    "scripts":  {
+                    "build":  "tsc"
+                },
+    "dependencies":  {
+                         "node-telegram-bot-api":  "^0.64.0",
+                         "ioredis":  "^5.3.2",
+                         "@mev-research/execution":  "workspace:*",
+                         "@mev-research/database":  "workspace:*",
+                         "@mev-research/shared":  "workspace:*"
+                     },
+    "devDependencies":  {
+                            "@types/node-telegram-bot-api":  "^0.64.7",
+                            "typescript":  "^5.3.3",
+                            "@types/node":  "^20.11.0"
+                        }
+}

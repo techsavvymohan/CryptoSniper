@@ -1,0 +1,21 @@
+﻿{
+    "name":  "@mev-research/execution",
+    "version":  "1.0.0",
+    "main":  "dist/index.js",
+    "types":  "dist/index.d.ts",
+    "scripts":  {
+                    "build":  "tsc"
+                },
+    "dependencies":  {
+    "@solana/web3.js": "1.98.4",
+                         "bs58":  "^5.0.0",
+                         "jito-ts":  "^3.0.0",
+                         "@mev-research/shared":  "workspace:*",
+                         "@mev-research/database":  "workspace:*",
+                         "winston":  "^3.11.0"
+                     },
+    "devDependencies":  {
+                            "typescript":  "^5.3.3",
+                            "@types/node":  "^20.11.0"
+                        }
+}
