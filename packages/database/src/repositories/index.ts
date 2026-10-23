@@ -5,3 +5,4 @@ export * from './latency-repository.js';
 export * from './statistics-repository.js';
 export * from './pool-repository.js';
 export * from './godfather-repository.js';
+export * from './audit-repository.js';

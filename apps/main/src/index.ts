@@ -22,6 +22,7 @@ import {
   PoolRepository,
   LatencyRepository,
   GodfatherRepository,
+  AuditRepository,
   db,
 } from '@mev-research/database';
 import {
@@ -30,6 +31,8 @@ import {
   OrcaSwapBuilder,
   JitoSubmitter,
   RiskEngine,
+  InstitutionalRiskEngine,
+  ExecutionGateway,
   ExecutionEngine,
   createDirectionalExecutor,
 } from '@mev-research/execution';
@@ -71,6 +74,26 @@ async function main() {
   const poolRepo = new PoolRepository(pool);
   const latencyRepo = new LatencyRepository(pool);
   const godfatherRepo = new GodfatherRepository(pool);
+  const auditRepo = new AuditRepository(pool);
+
+  // ─── Execution Safety Gateway & Institutional Risk Engine ────────────────────
+  const executionGateway = new ExecutionGateway({
+    maxSingleOrderNotionalUsd: 15_000,
+    maxDailyNotionalUsd: 150_000,
+    duplicateWindowMs: 5_000,
+    maxAllowedSlippageBps: 50,
+  });
+
+  const institutionalRiskEngine = new InstitutionalRiskEngine({
+    accountEquityUsd: 10_000,
+    dailyLossLimitUsd: config.godfather?.dailyLossLimitUsdc ?? 450,
+    maxDrawdownPct: config.godfather?.maxAccountDdPct ?? 9.0,
+    maxSinglePositionNotionalUsd: 25_000,
+    maxTotalPortfolioExposureUsd: 50_000,
+    consecutiveLossesThrottleThreshold: 2,
+    correlatedRiskScale: config.godfather?.correlatedUsdRiskScale ?? 0.60,
+    staleFeedThresholdMs: 2500,
+  });
 
   // ─── Execution Layer ─────────────────────────────────────────────────────────
   const rpcUrl = isHeliusConfigured(config.helius.apiKey)
@@ -212,21 +235,54 @@ async function main() {
     godfatherEngine.on('signal', async (signal) => {
       console.log(`[Godfather] 🎩 Signal: ${signal.grade} ${signal.direction} on ${signal.symbol} at $${signal.entryPrice} (Risk: $${signal.allocatedRiskUsd.toFixed(2)})`);
       await publish(CHANNELS.GODFATHER_SIGNALS, signal);
+      auditRepo.recordEvent({
+        correlationId: signal.id,
+        eventType: 'SIGNAL_DETECTED',
+        symbol: signal.symbol,
+        venue: gfConfig.venue,
+        status: 'SUCCESS',
+        details: { grade: signal.grade, direction: signal.direction, entry: signal.entryPrice, stopLoss: signal.stopLoss, riskUsd: signal.allocatedRiskUsd },
+      }).catch(() => { /* non-critical */ });
     });
 
     godfatherEngine.on('trade_opened', async (trade) => {
       console.log(`[Godfather] 🚀 Trade Opened: ${trade.direction} ${trade.symbol} | Size: ${trade.totalSize} | Entry: $${trade.entryPrice} | SL: $${trade.stopLoss}`);
       await publish(CHANNELS.GODFATHER_TRADES, { type: 'TRADE_OPENED', payload: trade });
+      auditRepo.recordEvent({
+        correlationId: trade.id,
+        eventType: 'ORDER_SUBMITTED',
+        symbol: trade.symbol,
+        venue: gfConfig.venue,
+        status: 'SUCCESS',
+        details: { size: trade.totalSize, entry: trade.entryPrice, stopLoss: trade.stopLoss },
+      }).catch(() => { /* non-critical */ });
     });
 
     godfatherEngine.on('tranche_exit', async ({ trade, result }) => {
       console.log(`[Godfather] 🎯 Tranche Update: ${trade.symbol} ${result.action} (${result.message}) | PnL: +$${result.realizedPnlDeltaUsd.toFixed(2)}`);
       await publish(CHANNELS.GODFATHER_TRADES, { type: 'TRANCHE_EXIT', payload: { trade, result } });
+      auditRepo.recordEvent({
+        correlationId: trade.id,
+        eventType: 'TRANCHE_EXIT',
+        symbol: trade.symbol,
+        venue: gfConfig.venue,
+        status: 'SUCCESS',
+        details: { action: result.action, message: result.message, pnlDelta: result.realizedPnlDeltaUsd },
+      }).catch(() => { /* non-critical */ });
     });
 
     godfatherEngine.on('trade_closed', async (trade) => {
       console.log(`[Godfather] 🏁 Trade Closed: ${trade.symbol} ${trade.direction} | Exit: ${trade.exitReason} | Realized PnL: $${trade.realizedPnlUsd.toFixed(2)}`);
       await publish(CHANNELS.GODFATHER_TRADES, { type: 'TRADE_CLOSED', payload: trade });
+      institutionalRiskEngine.recordTradeOutcome(trade.realizedPnlUsd);
+      auditRepo.recordEvent({
+        correlationId: trade.id,
+        eventType: 'FILL_RECONCILED',
+        symbol: trade.symbol,
+        venue: gfConfig.venue,
+        status: trade.realizedPnlUsd >= 0 ? 'SUCCESS' : 'FAILED',
+        details: { exitReason: trade.exitReason, realizedPnlUsd: trade.realizedPnlUsd },
+      }).catch(() => { /* non-critical */ });
     });
 
     godfatherEngine.on('alert', (msg) => {
