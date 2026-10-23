@@ -66,14 +66,14 @@ export function loadConfig(): AppConfig {
       jitoEndpointsNy: process.env['JITO_ENDPOINTS_NY'],
     },
     database: {
-      url: requireEnv('DATABASE_URL'),
+      url: process.env['DATABASE_URL'] ?? '',
     },
     redis: {
-      url: requireEnv('REDIS_URL'),
+      url: process.env['REDIS_URL'] ?? '',
     },
     telegram: {
-      botToken: requireEnv('TELEGRAM_BOT_TOKEN'),
-      adminChatId: requireEnv('TELEGRAM_ADMIN_CHAT_ID'),
+      botToken: process.env['TELEGRAM_BOT_TOKEN'] ?? '',
+      adminChatId: process.env['TELEGRAM_ADMIN_CHAT_ID'] ?? '',
     },
     api: {
       port: process.env['PORT'] ? requireInt('PORT') : 3001,

@@ -208,10 +208,28 @@ solana-mev-arbitrage-bot/
 
 ## 🚀 Quick Start Guide
 
+### 🌟 Option A: 1-Click Standalone Mode (Recommended for Windows PC / VPS)
+**Zero External PostgreSQL required. Zero Redis required. Zero Website/Dashboard required.**
+All trades, open orders, and PnL are held in RAM memory with real-time terminal trade tracking.
+
+1. Double-click `run-bot.bat` (or run `pnpm start` in PowerShell).
+2. The bot will automatically create `.env` if missing, detect Standalone Mode, and start scanning Hyperliquid/Bybit for profitable trades.
+3. If no private key is supplied, it automatically runs in **Paper Trading Mode** with zero financial risk.
+
+```powershell
+# 1-Click Run on Windows / VPS:
+.\run-bot.bat
+```
+
+---
+
+### 🏢 Option B: Full Institutional Monorepo Stack (With DB, Redis & Dashboard)
+If you wish to run the full institutional stack with PostgreSQL, Redis, and Next.js 14 web platform:
+
 ### 1. Prerequisites
 - **Node.js**: v20+ or v22+
 - **PNPM**: `npm install -g pnpm`
-- **PostgreSQL & Redis**: Running natively on `localhost` (No Docker required).
+- **PostgreSQL & Redis**: Running natively on `localhost`.
 
 ### 2. Installation & Database Setup
 ```powershell

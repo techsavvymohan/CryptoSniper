@@ -92,8 +92,7 @@ export class HyperliquidFootprintService extends EventEmitter {
     if (!this.isRunning) return;
 
     try {
-      const WS = (globalThis as any).WebSocket || WebSocket;
-      this.ws = new WS(this.wsUrl);
+      this.ws = new WebSocket(this.wsUrl);
 
       this.ws.on('open', () => {
         this.reconnectAttempt = 0;

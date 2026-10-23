@@ -24,27 +24,51 @@ export class DirectionalExecutionManager extends EventEmitter implements IDirect
     super();
     this.activeVenue = config.venue ?? 'paper';
 
-    if (this.activeVenue === 'hyperliquid') {
-      this.primaryAdapter = new HyperliquidAdapter({
-        privateKey: config.hyperliquid?.privateKey,
-        vaultAddress: config.hyperliquid?.vaultAddress,
-        testnet: config.testnet,
-      });
+    const hasValidHlKey =
+      typeof config.hyperliquid?.privateKey === 'string' &&
+      config.hyperliquid.privateKey.startsWith('0x') &&
+      config.hyperliquid.privateKey.length === 66;
 
-      // Bybit as secondary fallback if API keys provided
-      if (config.bybit?.apiKey) {
-        this.fallbackAdapter = new BybitAdapter({
-          apiKey: config.bybit.apiKey,
-          apiSecret: config.bybit.apiSecret,
+    const hasValidBybitKey =
+      typeof config.bybit?.apiKey === 'string' &&
+      config.bybit.apiKey.length > 10 &&
+      !config.bybit.apiKey.includes('your_');
+
+    if (this.activeVenue === 'hyperliquid') {
+      if (!hasValidHlKey) {
+        console.warn('[ExecutionManager] ⚠️ Valid Hyperliquid private key not found in .env.');
+        console.log('[ExecutionManager] 🧪 Auto-defaulting to PAPER TRADING mode (zero-risk simulated fills).');
+        this.activeVenue = 'paper';
+        this.primaryAdapter = new PaperDirectionalExecutor();
+      } else {
+        this.primaryAdapter = new HyperliquidAdapter({
+          privateKey: config.hyperliquid?.privateKey,
+          vaultAddress: config.hyperliquid?.vaultAddress,
+          testnet: config.testnet,
+        });
+
+        // Bybit as secondary fallback if API keys provided
+        if (hasValidBybitKey) {
+          this.fallbackAdapter = new BybitAdapter({
+            apiKey: config.bybit!.apiKey,
+            apiSecret: config.bybit!.apiSecret,
+            testnet: config.testnet,
+          });
+        }
+      }
+    } else if (this.activeVenue === 'bybit') {
+      if (!hasValidBybitKey) {
+        console.warn('[ExecutionManager] ⚠️ Valid Bybit API keys not found in .env.');
+        console.log('[ExecutionManager] 🧪 Auto-defaulting to PAPER TRADING mode (zero-risk simulated fills).');
+        this.activeVenue = 'paper';
+        this.primaryAdapter = new PaperDirectionalExecutor();
+      } else {
+        this.primaryAdapter = new BybitAdapter({
+          apiKey: config.bybit?.apiKey,
+          apiSecret: config.bybit?.apiSecret,
           testnet: config.testnet,
         });
       }
-    } else if (this.activeVenue === 'bybit') {
-      this.primaryAdapter = new BybitAdapter({
-        apiKey: config.bybit?.apiKey,
-        apiSecret: config.bybit?.apiSecret,
-        testnet: config.testnet,
-      });
     } else {
       // Paper trading
       this.primaryAdapter = new PaperDirectionalExecutor();
