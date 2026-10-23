@@ -9,6 +9,7 @@
     "redis": "powershell -ExecutionPolicy Bypass -File scripts/start-redis.ps1",
     "start": "pnpm --filter @mev-research/main start",
     "dev": "pnpm --filter @mev-research/main dev",
+    "fetch-data": "python scripts/fetch_historical_data.py",
     "dashboard": "pnpm --filter dashboard dev"
   },
   "devDependencies": {
