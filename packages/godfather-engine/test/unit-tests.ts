@@ -239,13 +239,13 @@ describe('🎩 GODFATHER Math & Microstructure Layer', () => {
   });
 
   describe('5. 3-Tranche Lifecycle & Breakeven Ratchet', () => {
-    it('Initializes 35% / 35% / 30% tranches and locks Breakeven on Tranche 1 hit', () => {
-      const tranches = createTranches('trade-1', 67000, 66900, 1.0, 'BUY', 2.5);
+    it('Initializes 35% / 35% / 30% tranches, moves SL to -0.40R on Tranche 1 hit, and locks Breakeven at +2.0R milestone', () => {
+      const tranches = createTranches('trade-1', 67000, 66900, 1.0, 'BUY', 3.0);
       assert.strictEqual(tranches.length, 3);
       assert.strictEqual(tranches[0]!.size, 0.35);
       assert.strictEqual(tranches[0]!.targetPrice, 67150); // +1.50R
       assert.strictEqual(tranches[1]!.size, 0.35);
-      assert.strictEqual(tranches[1]!.targetPrice, 67250); // +2.50R
+      assert.strictEqual(tranches[1]!.targetPrice, 67300); // +3.00R (expanded targetR2)
       assert.strictEqual(tranches[2]!.size, 0.30);
 
       const trade = {
@@ -281,12 +281,43 @@ describe('🎩 GODFATHER Math & Microstructure Layer', () => {
 
       const result = evaluateTrancheExits(trade, hitCandle, 50, 2);
       assert.strictEqual(result.action, 'TRANCHE_1_HIT');
-      assert.strictEqual(result.tradeUpdates?.isBreakevenLocked, true);
-      assert.ok(
-        result.tradeUpdates?.stopLoss! > 67000,
-        'Stop Loss should be ratcheted above entry (+0.10R buffer)',
+      // Ratchets SL to reduced risk (-0.40R = 66,960) to provide breathing room against FVG retest wicks
+      assert.strictEqual(result.tradeUpdates?.isBreakevenLocked, false);
+      assert.strictEqual(
+        result.tradeUpdates?.stopLoss,
+        66960,
+        'Stop Loss should be ratcheted to reduced risk (-0.40R = 66,960)',
       );
       assert.strictEqual(result.realizedPnlDeltaUsd, 52.5); // (67150 - 67000) * 0.35 = 52.5 USD
+
+      // Subsequent candle reaching +2.00R (67200) triggers the Breakeven lock
+      const tradeAfterT1 = {
+        ...trade,
+        ...result.tradeUpdates,
+        tranches: trade.tranches.map(t =>
+          t.trancheNumber === 1 ? { ...t, status: 'TAKEN' as const } : t
+        ),
+      };
+
+      const beCandle: Candle = {
+        symbol: 'BTCUSD',
+        timeframe: 'M1',
+        openTime: 120000,
+        open: 67155,
+        high: 67205,
+        low: 67150,
+        close: 67200,
+        volume: 12,
+        closeTime: 180000,
+        isClosed: true,
+      };
+
+      const beResult = evaluateTrancheExits(tradeAfterT1, beCandle, 50, 3);
+      assert.strictEqual(beResult.tradeUpdates?.isBreakevenLocked, true);
+      assert.ok(
+        beResult.tradeUpdates?.stopLoss! >= 67010,
+        'Stop Loss should now be ratcheted to entry (+0.10R buffer) at the +2.00R milestone',
+      );
     });
   });
 

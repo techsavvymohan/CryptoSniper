@@ -10,9 +10,10 @@ export interface PositionParams {
   isWeekend?: boolean;
   hasCorrelatedUsdExposure?: boolean;
   baseRiskPct?: number; // Default 0.85%
-  convictionScaleAPlus?: number; // Default 2.40
+  convictionScaleAPlus?: number; // Default 1.25
   convictionScaleA?: number; // Default 1.00
   convictionScaleB?: number; // Default 0.50
+  sessionMultiplier?: number; // London 1.35x, US ETF 0.75x, Asia 1.00x
 }
 
 export interface PositionCalculation {
@@ -38,6 +39,7 @@ export function calculateGodfatherPosition(params: PositionParams): PositionCalc
     convictionScaleAPlus = 1.25,
     convictionScaleA = 1.00,
     convictionScaleB = 0.50,
+    sessionMultiplier = 1.00,
   } = params;
 
   if (accountEquity <= 0) {
@@ -104,6 +106,11 @@ export function calculateGodfatherPosition(params: PositionParams): PositionCalc
   // Net Beta Gate
   if (hasCorrelatedUsdExposure) {
     multiplier *= 0.60;
+  }
+
+  // Session Conviction (London 1.35x, US ETF 0.75x)
+  if (sessionMultiplier > 0) {
+    multiplier *= sessionMultiplier;
   }
 
   const baseRiskUsd = accountEquity * (baseRiskPct / 100);

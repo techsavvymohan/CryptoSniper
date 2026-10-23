@@ -87,7 +87,7 @@ export function loadConfig(): AppConfig {
       enabled: process.env['GODFATHER_ENABLED'] !== 'false',
       symbols: process.env['GODFATHER_SYMBOLS']
         ? process.env['GODFATHER_SYMBOLS'].split(',')
-        : ['BTCUSD', 'ETHUSD', 'SOLUSD', 'DOGEUSD', 'SUIUSD', 'AVAXUSD', 'NEARUSD', 'LINKUSD', 'APTUSD', 'ARBUSD', 'OPUSD', 'WIFUSD', 'PEPEUSD', 'TIAUSD', 'INJUSD'],
+        : ['BTCUSD', 'SOLUSD', 'DOGEUSD', 'INJUSD', 'OPUSD', 'AVAXUSD'],
       venue: (process.env['DIRECTIONAL_VENUE'] as 'hyperliquid' | 'bybit' | 'paper') ?? 'paper',
       testnet: process.env['DIRECTIONAL_TESTNET'] !== 'false',
       hyperliquid: {

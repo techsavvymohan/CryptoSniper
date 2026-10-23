@@ -44,5 +44,9 @@ pgdata
 redisdata
 .redis-local
 
+# Python artifacts
+__pycache__/
+*.pyc
+
 # Bulk raw historical futures downloads
 data/historical/*_2026_01_to_2026_09.csv

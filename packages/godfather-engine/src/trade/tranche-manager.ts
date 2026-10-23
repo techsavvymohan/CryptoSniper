@@ -26,7 +26,7 @@ export function createTranches(
   stopLoss: number,
   totalSize: number,
   direction: TradeDirection,
-  targetR2 = 2.5,
+  targetR2 = 3.0,
 ): GodfatherTranche[] {
   const rDistance = Math.abs(entryPrice - stopLoss);
   const size1 = parseFloat((totalSize * 0.35).toFixed(4));
@@ -83,14 +83,20 @@ export function evaluateTrancheExits(
   currentCandle: Candle,
   atr: number,
   barsInTrade: number,
-  maxStagnationBars = 20,
+  maxStagnationBars = 36,
 ): TrancheEvaluationResult {
   if (trade.status !== 'OPEN') {
     return { action: 'NONE', realizedPnlDeltaUsd: 0 };
   }
 
   const { direction, entryPrice, stopLoss } = trade;
-  const rDistance = Math.abs(entryPrice - stopLoss);
+  // Derive immutable initial 1R unit risk distance: use initialStopLoss, or recover from Tranche 1 geometry, or fallback to current stopLoss
+  const t1Tranche = trade.tranches.find(t => t.trancheNumber === 1);
+  const rDistance = trade.initialStopLoss !== undefined
+    ? Math.abs(entryPrice - trade.initialStopLoss)
+    : (t1Tranche?.targetPrice && t1Tranche.targetRr
+        ? Math.abs(t1Tranche.targetPrice - entryPrice) / t1Tranche.targetRr
+        : Math.abs(entryPrice - stopLoss));
   const bufferR = rDistance * 0.10; // +0.10R buffer for breakeven lock
 
   // 1. Check Full Stop Loss
@@ -204,14 +210,17 @@ export function evaluateTrancheExits(
           ? (exitPrice - entryPrice) * t1.size
           : (entryPrice - exitPrice) * t1.size;
 
+      // Move Stop Loss to reduced risk (-0.40R) to give breathing room for normal FVG retests
+      const reducedRiskPrice = direction === 'BUY' ? entryPrice - 0.40 * rDistance : entryPrice + 0.40 * rDistance;
       const bePrice = direction === 'BUY' ? entryPrice + bufferR : entryPrice - bufferR;
 
       return {
         action: 'TRANCHE_1_HIT',
         tradeUpdates: {
-          stopLoss: bePrice,
+          stopLoss: reducedRiskPrice,
+          initialStopLoss: trade.initialStopLoss ?? stopLoss,
           breakevenPrice: bePrice,
-          isBreakevenLocked: true,
+          isBreakevenLocked: false,
           remainingSize: trade.remainingSize - t1.size,
           realizedPnlUsd: trade.realizedPnlUsd + pnl,
         },
@@ -227,12 +236,37 @@ export function evaluateTrancheExits(
           },
         ],
         realizedPnlDeltaUsd: pnl,
-        message: `Tranche 1 (+1.50R) Banked! SL moved to Breakeven (${bePrice})`,
+        message: `Tranche 1 (+1.50R) Banked! SL moved to reduced risk -0.40R (${reducedRiskPrice.toFixed(2)})`,
       };
     }
   }
 
-  // Check Tranche 2 (+2.00R to +2.50R)
+  // Check Breakeven Milestone (+2.00R Hit)
+  // If Tranche 1 is taken but BE is not yet locked, lock full Breakeven once price expands to +2.00R
+  const t1Taken = trade.tranches.find(t => t.trancheNumber === 1)?.status === 'TAKEN';
+  if (t1Taken && !trade.isBreakevenLocked) {
+    const beTriggerPrice = direction === 'BUY' ? entryPrice + 2.0 * rDistance : entryPrice - 2.0 * rDistance;
+    const beTriggerHit =
+      direction === 'BUY'
+        ? currentCandle.high >= beTriggerPrice
+        : currentCandle.low <= beTriggerPrice;
+
+    if (beTriggerHit) {
+      const bePrice = direction === 'BUY' ? entryPrice + bufferR : entryPrice - bufferR;
+      return {
+        action: 'NONE',
+        tradeUpdates: {
+          stopLoss: bePrice,
+          breakevenPrice: bePrice,
+          isBreakevenLocked: true,
+        },
+        realizedPnlDeltaUsd: 0,
+        message: `+2.00R Milestone Reached! Stop Loss locked to Breakeven (${bePrice.toFixed(2)})`,
+      };
+    }
+  }
+
+  // Check Tranche 2 (+3.00R)
   if (t2 && t2.targetPrice !== undefined) {
     const t2Hit =
       direction === 'BUY'
@@ -246,9 +280,13 @@ export function evaluateTrancheExits(
           ? (exitPrice - entryPrice) * t2.size
           : (entryPrice - exitPrice) * t2.size;
 
+      const profitLockSl = direction === 'BUY' ? entryPrice + 1.0 * rDistance : entryPrice - 1.0 * rDistance;
+
       return {
         action: 'TRANCHE_2_HIT',
         tradeUpdates: {
+          stopLoss: profitLockSl,
+          isBreakevenLocked: true,
           remainingSize: trade.remainingSize - t2.size,
           realizedPnlUsd: trade.realizedPnlUsd + pnl,
         },
@@ -264,7 +302,7 @@ export function evaluateTrancheExits(
           },
         ],
         realizedPnlDeltaUsd: pnl,
-        message: `Tranche 2 Banked at ${exitPrice}!`,
+        message: `Tranche 2 Banked at ${exitPrice}! Stop Loss ratcheted to +1.00R Profit Lock (${profitLockSl.toFixed(2)})`,
       };
     }
   }
@@ -311,9 +349,12 @@ export function evaluateTrancheExits(
       };
     }
 
-    // Ratchet Trailing Stop up (BUY) or down (SELL) via 3.0x ATR
+    // Ratchet Trailing Stop up (BUY) or down (SELL) via dynamic ATR
+    // 3.5x ATR on BTC, 4.5x ATR on explosive Altcoins
     if (atr > 0) {
-      const chandelierDistance = 3.0 * atr;
+      const isBtc = trade.symbol?.toUpperCase().includes('BTC');
+      const chandelierMultiplier = isBtc ? 3.5 : 4.5;
+      const chandelierDistance = chandelierMultiplier * atr;
       if (direction === 'BUY') {
         const potentialTrail = currentCandle.high - chandelierDistance;
         if (potentialTrail > currentTrail + 0.10) {

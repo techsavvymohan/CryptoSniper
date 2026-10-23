@@ -202,6 +202,7 @@ export class GodfatherEngine extends EventEmitter {
           direction: signal.direction,
           entryPrice: signal.entryPrice,
           stopLoss: signal.stopLoss,
+          initialStopLoss: signal.stopLoss,
           breakevenPrice: signal.entryPrice,
           isBreakevenLocked: false,
           totalSize: signal.positionSize,
@@ -254,8 +255,8 @@ export class GodfatherEngine extends EventEmitter {
     const m15Atr = m15AtrSeries.length > 0 ? m15AtrSeries[m15AtrSeries.length - 1]! : 0;
 
     const maxStagnationBars = symbol.toUpperCase().includes('BTC')
-      ? this.config.btcRetestMaxBars * 3
-      : this.config.solRetestMaxBars * 3;
+      ? Math.max(this.config.btcRetestMaxBars * 4, 32)
+      : Math.max(this.config.solRetestMaxBars * 3, 36);
 
     for (const [tradeId, activeEntry] of this.activeTrades.entries()) {
       const { trade, barsInTrade } = activeEntry;
@@ -392,7 +393,7 @@ export class GodfatherEngine extends EventEmitter {
       : Math.max(m15Atr * 0.35, currentM1.close * 0.0005);
 
     const minFvgGapUsd = isBtc ? 10.0 : isSol ? 0.10 : Math.max(m15Atr * 0.05, currentM1.close * 0.0001);
-    const buffer = isBtc ? 15.0 : isSol ? 0.20 : Math.max(m15Atr * 0.10, currentM1.close * 0.0002);
+    const buffer = isBtc ? 15.0 : Math.max(m15Atr * 0.40, currentM1.close * 0.0003);
 
     // ==========================================
     // 1. EVALUATE BULLISH SETUP (Sweep of SSL)
@@ -511,6 +512,13 @@ export class GodfatherEngine extends EventEmitter {
       currentCandle,
     } = params;
 
+    let sessionMultiplier = 1.00;
+    if (session.startsWith('LONDON')) {
+      sessionMultiplier = 1.35;
+    } else if (session.startsWith('US_')) {
+      sessionMultiplier = 0.75;
+    }
+
     const sizing = calculateGodfatherPosition({
       symbol,
       accountEquity: this.accountEquity,
@@ -524,6 +532,7 @@ export class GodfatherEngine extends EventEmitter {
       convictionScaleAPlus: this.config.convictionScaleAPlus,
       convictionScaleA: this.config.convictionScaleA,
       convictionScaleB: this.config.convictionScaleB,
+      sessionMultiplier,
     });
 
     if (!sizing.isValid || sizing.positionSize <= 0) {
@@ -570,7 +579,7 @@ export class GodfatherEngine extends EventEmitter {
 
     this.emit('signal', signal);
 
-    const targetR2 = isBtc ? 2.0 : 2.5;
+    const targetR2 = isBtc ? 2.5 : 3.0;
     const tranches = createTranches(
       signalId,
       entryPrice,
@@ -622,6 +631,7 @@ export class GodfatherEngine extends EventEmitter {
       direction,
       entryPrice,
       stopLoss,
+      initialStopLoss: stopLoss,
       breakevenPrice: entryPrice,
       isBreakevenLocked: false,
       totalSize: sizing.positionSize,

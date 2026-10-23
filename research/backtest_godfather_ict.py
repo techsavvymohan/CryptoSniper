@@ -12,6 +12,7 @@ import os
 import sys
 import math
 from datetime import datetime, timezone
+from bisect import bisect_left
 import pandas as pd
 import numpy as np
 
@@ -425,9 +426,10 @@ class InstitutionalGodfatherBacktest:
 
                 # Retrieve strictly historical 15m bars up to this 5m bar timestamp (Zero lookahead)
                 curr_15m_ts = bar['m15_timestamp']
-                hist_15m_ts = [ts for ts in m15_timestamps if ts < curr_15m_ts]
-                if len(hist_15m_ts) < 25:
+                idx_15m = bisect_left(m15_timestamps, curr_15m_ts)
+                if idx_15m < 25:
                     continue
+                hist_15m_ts = m15_timestamps[:idx_15m]
 
                 last_15m = m15_by_ts[hist_15m_ts[-1]]
                 if last_15m['chop'] > 61.8:
@@ -672,14 +674,12 @@ def main():
     print("=" * 80)
     print("🎩 THE GODFATHER QUANTITATIVE ENGINE: MULTI-ASSET ICT HISTORICAL BACKTEST")
     print("Period: January 1, 2026 - September 30, 2026 (9 Months Real Binance Futures)")
-    print("Universe: 15 High-Liquidity Perpetual Pairs | Initial Equity: $10,000.00")
+    print("Universe: Top 7 Alpha Winners (BTC, SOL, DOGE, INJ, OP, AVAX, APT) | Equity: $10,000.00")
     print("Risk: 0.85% Base Risk | Sizing: 1.25x A+ / 1.00x A | Fees: Maker 0.02%, Taker 0.05%")
     print("=" * 80)
 
     all_symbols = [
-        "BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "SUIUSDT",
-        "AVAXUSDT", "NEARUSDT", "LINKUSDT", "APTUSDT", "ARBUSDT",
-        "OPUSDT", "WIFUSDT", "1000PEPEUSDT", "TIAUSDT", "INJUSDT"
+        "BTCUSDT", "SOLUSDT", "DOGEUSDT", "INJUSDT", "OPUSDT", "AVAXUSDT", "APTUSDT"
     ]
 
     results = []

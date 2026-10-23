@@ -76,6 +76,7 @@ export interface GodfatherTrade {
   direction: TradeDirection;
   entryPrice: number;
   stopLoss: number;
+  initialStopLoss?: number;
   breakevenPrice: number;
   isBreakevenLocked: boolean;
   totalSize: number;
