@@ -1,3 +1,5 @@
+import type { GodfatherConfig } from './godfather.js';
+
 export interface PoolSnapshot {
   address: string;
   tokenMintA: string;
@@ -122,8 +124,17 @@ export interface AppConfig {
   helius: {
     grpcUrl: string;
     apiKey: string;
+    multiRegionEnabled?: boolean;
+    grpcAms?: string;
+    grpcTyo?: string;
+    grpcEwr?: string;
   };
-  execution: ExecutionConfig;
+  execution: ExecutionConfig & {
+    multiRegionJitoEnabled?: boolean;
+    jitoEndpointsAms?: string;
+    jitoEndpointsTyo?: string;
+    jitoEndpointsNy?: string;
+  };
   database: {
     url: string;
   };
@@ -142,7 +153,10 @@ export interface AppConfig {
     prometheusPort: number;
   };
   logLevel: string;
+  godfather?: GodfatherConfig;
 }
+
+export * from './godfather.js';
 
 export type MEVEventType =
   | 'ORDER_SUBMITTED'
@@ -152,10 +166,15 @@ export type MEVEventType =
   | 'KILL_SWITCH_RELEASED'
   | 'OPPORTUNITY_DETECTED'
   | 'SIMULATION_COMPLETE'
-  | 'DAILY_LIMIT_REACHED';
+  | 'DAILY_LIMIT_REACHED'
+  | 'GODFATHER_SIGNAL'
+  | 'GODFATHER_TRADE_OPENED'
+  | 'GODFATHER_TRANCHE_HIT'
+  | 'GODFATHER_TRADE_CLOSED';
 
 export interface MEVEvent {
   type: MEVEventType;
   payload: Record<string, unknown>;
   timestamp: number;
 }
+

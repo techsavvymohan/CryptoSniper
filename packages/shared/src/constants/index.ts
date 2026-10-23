@@ -27,6 +27,9 @@ export const CHANNELS = {
   OPPORTUNITIES: 'mev:opportunities',
   POOL_UPDATES: 'mev:pools',
   ALERTS: 'mev:alerts',
+  GODFATHER_SIGNALS: 'godfather:signals',
+  GODFATHER_TRADES: 'godfather:trades',
+  GODFATHER_CANDLES: 'godfather:candles',
 } as const;
 
 export const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');

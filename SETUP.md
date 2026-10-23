@@ -1,12 +1,14 @@
 # Setup Guide — We'll Walk Through This Together
 
-This guide assumes you're setting up the bot for the first time. Follow each step in order. Don't skip ahead — later steps depend on earlier ones.
+This guide walks you through setting up the institutional dual-engine quantitative fund bot from scratch. Follow each step in order. Don't skip ahead — later steps depend on earlier ones.
 
-**What we're building:** A bot that watches Solana DEX prices, finds arbitrage opportunities, and either simulates trades (safe) or executes them for real (only when you're ready).
+**What we're building:** A dual-engine crypto trading fund system:
+1. **Engine 1 (Solana MEV Arbitrage)**: Watches Raydium CLMM, Orca Whirlpool, and OpenBook on Solana, detects price mispricings via Yellowstone Geyser gRPC, and executes atomic, zero-capital-risk back-run arbitrage bundles via the Jito Block Engine.
+2. **Engine 2 (The GODFATHER Directional Scalper)**: Institutional Price-Action & Microstructure scalping engine on **Bitcoin ($BTCUSD$)** and **Solana ($SOLUSD$)**, utilizing a 5-stage confluence trigger (Fractal Sweeps, Delta Absorption, Displacement, MSS, and FVG Retest) with 3-tranche execution across **Hyperliquid L1** (primary native DEX) and **Bybit V5** (secondary CEX fallback).
 
-**Important:** This project does **not** use Docker. You install PostgreSQL and Redis directly on your computer, like normal desktop apps.
+**Important:** This project does **not** use Docker for native development. You install PostgreSQL and Redis directly on your machine for maximum sub-millisecond execution performance.
 
-Need the big-picture architecture? See [README.md](./README.md).
+Need the big-picture architecture? See [README.md](./README.md) and [CRYPTO_ALGO_BOT_BLUEPRINT.md](./CRYPTO_ALGO_BOT_BLUEPRINT.md). For the complete manual trading playbook in Hinglish, see [strategy.md](./strategy.md).
 
 ---
 
@@ -15,19 +17,19 @@ Need the big-picture architecture? See [README.md](./README.md).
 Here's every step we'll do together:
 
 ```
-Step 1  → Install the tools you need (Node, database, Redis)
-Step 2  → Download the project code
-Step 3  → Fill in your .env file (passwords, API keys, wallet)
-Step 4  → Create the database tables
-Step 5  → Build the code
-Step 6  → Start the bot (simulation mode — no real money)
-Step 7  → Open the dashboard in your browser
-Step 8  → Test that everything works
+Step 1  → Install the tools you need (Node v20+, PostgreSQL, Redis)
+Step 2  → Download the project code & install pnpm dependencies
+Step 3  → Fill in your .env file (Solana RPC, Jito, Hyperliquid/Bybit API, risk limits)
+Step 4  → Create the database tables & run migrations (MEV + Godfather schemas)
+Step 5  → Build all 13 monorepo packages cleanly
+Step 6  → Start the dual-engine bot (simulation mode — no real money at risk)
+Step 7  → Open the Next.js 14 dashboard in your browser (/execution, /simulation, /godfather)
+Step 8  → Test endpoints, Telegram alerts, and verify execution venues
 ```
 
 **Time estimate:** 30–60 minutes for first-time setup (not counting waiting for account sign-ups).
 
-**Golden rule:** Keep `SIMULATION_MODE=true` until you've run the bot safely for days and checked the go-live list at the end of this guide.
+**Golden rule:** Keep `SIMULATION_MODE=true` and `DIRECTIONAL_TESTNET=true` (or `DIRECTIONAL_VENUE=paper`) until you've run the bot safely for days and verified all confluence signals.
 
 ---
 
@@ -38,7 +40,7 @@ Think of these as the "ingredients" before we cook.
 ### 1a. Node.js (runs the bot)
 
 1. Go to [nodejs.org](https://nodejs.org/)
-2. Download the **LTS** version (20 or higher)
+2. Download the **LTS** version (Node.js 20 or higher)
 3. Run the installer — click Next through everything
 4. Open PowerShell and check it worked:
 
@@ -52,7 +54,7 @@ node --version
 
 ### 1b. PNPM (installs project packages)
 
-PNPM is like npm, but faster for this type of project.
+PNPM is required for monorepo workspace package resolution:
 
 ```powershell
 npm install -g pnpm
@@ -175,12 +177,16 @@ If you see `Could not connect`, Redis isn't running yet — go back and start th
 
 You don't need all of these on day one, but it's good to start sign-ups while installing software:
 
-| What | Why you need it | Where to sign up |
-|---|---|---|
-| **Helius** | Live market data from Solana | [helius.dev](https://helius.dev/) |
-| **Telegram bot** | Get alerts on your phone, emergency stop | [@BotFather](https://t.me/BotFather) on Telegram |
-| **Solana wallet** | Holds your trading money (later) | Phantom, Solflare, etc. |
-| **Jito** | Sends real trades (only for live mode) | [jito.wtf/searcher](https://jito.wtf/searcher) |
+| What | Why you need it | Engine | Where to sign up |
+|---|---|---|---|
+| **Helius** | Live Solana market data (Geyser gRPC) | Engine 1 (Solana MEV) | [helius.dev](https://helius.dev/) |
+| **Telegram bot** | Mobile alerts & instant `/kill` emergency stop | Both Engines | [@BotFather](https://t.me/BotFather) on Telegram |
+| **Solana wallet** | Holds SOL/USDC trading funds & pays Jito tips | Engine 1 (Solana MEV) | Phantom, Solflare, etc. |
+| **Jito** | Sends atomic MEV bundles directly to validators | Engine 1 (Solana MEV) | [jito.wtf/searcher](https://jito.wtf/searcher) |
+| **Hyperliquid** | Primary native DEX venue for BTC/SOL perps (L1 orderbook, maker rebates) | Engine 2 (GODFATHER) | [app.hyperliquid.xyz](https://app.hyperliquid.xyz) (Testnet: [app.hyperliquid-testnet.xyz](https://app.hyperliquid-testnet.xyz)) |
+| **Bybit V5** | Secondary CEX fallback for BTC/SOL perps (Unified Trading Account) | Engine 2 (GODFATHER) | [bybit.com](https://bybit.com) (Testnet: [testnet.bybit.com](https://testnet.bybit.com)) |
+
+> **Note on Godfather Venues:** You can start immediately with `DIRECTIONAL_VENUE=paper` (zero capital, zero API keys required). When moving to testnet, Hyperliquid Testnet requires zero KYC and provides free testnet USDC!
 
 ---
 
@@ -190,10 +196,10 @@ Open PowerShell in the folder where you keep projects:
 
 ```powershell
 git clone <your-repo-url>
-cd solana-arbitrage-bot
+cd solana-mev-arbitrage-bot
 ```
 
-Now install all the code libraries the project needs:
+Now install all the monorepo packages:
 
 ```powershell
 pnpm install
@@ -207,13 +213,13 @@ This takes 1–3 minutes. **You should see** a progress bar and then `Done`.
 pnpm install --dangerously-allow-all-builds
 ```
 
-Don't worry — the name sounds scary, but it just lets some native Solana libraries compile. The project `.npmrc` is already set up for this.
+Don't worry — the name sounds scary, but it just lets native Solana and cryptographic libraries compile. The project `.npmrc` is already configured for this.
 
 ---
 
 ## Step 3 — Fill in your `.env` file
 
-The `.env` file is where all your secrets and settings live. The bot reads this file on startup.
+The `.env` file is where all your secrets, API keys, and trading settings live. The bot reads this file on startup.
 
 ### 3a. Create the file
 
@@ -221,15 +227,15 @@ The `.env` file is where all your secrets and settings live. The bot reads this 
 Copy-Item .env.example .env
 ```
 
-Now open `.env` in any text editor (Notepad, VS Code, Cursor — whatever you use).
+Now open `.env` in any text editor (VS Code, Notepad, Cursor).
 
 ### 3b. Fill in each section
 
-Work through the file top to bottom. I'll explain each part in plain English.
+Work through the file section by section:
 
 ---
 
-#### Connectivity — how the bot talks to Solana
+#### 1. Solana Connectivity (Engine 1 - MEV Arbitrage)
 
 ```env
 HELIUS_GRPC_URL=mainnet.helius-rpc.com:443
@@ -241,14 +247,9 @@ HELIUS_API_KEY=your_helius_api_key_here
 | `HELIUS_GRPC_URL` | `mainnet.helius-rpc.com:443` | Don't add `https://` at the start |
 | `HELIUS_API_KEY` | Your key from [Helius dashboard](https://dashboard.helius.dev/) | Leaving the placeholder text |
 
-**How to get your Helius key:**
-1. Log in to [dashboard.helius.dev](https://dashboard.helius.dev/)
-2. Create a new API key
-3. Copy it and paste into `.env`
-
 ---
 
-#### Database and Redis — connect to what we installed in Step 1
+#### 2. Database and Redis (Storage & Event Bus)
 
 ```env
 DATABASE_URL=postgresql://mev_user:mev_pass@localhost:5432/mev_research
@@ -257,49 +258,22 @@ REDIS_URL=redis://localhost:6379
 
 **These should match what you created in Step 1d.** If you changed the password from `mev_pass`, update it here too.
 
-Think of `DATABASE_URL` as: `postgresql://USERNAME:PASSWORD@WHERE:PORT/DATABASE_NAME`
-
 ---
 
-#### Wallet — your trading account
+#### 3. Solana Wallet & Jito (Engine 1 Real Trades)
 
 ```env
 BOT_WALLET_PRIVATE_KEY=your_trading_wallet_private_key_base58
-```
-
-This is the private key of the Solana wallet the bot will trade from.
-
-**How to get it:**
-- Export from Phantom: Settings → Security & Privacy → Export Private Key
-- It will be a long string of letters and numbers (base58 format)
-
-**Never share this. Never commit it to GitHub.** Treat it like your bank password.
-
-> For simulation mode, the wallet doesn't need money yet — but the key still must be valid so the bot can read balances.
-
----
-
-#### Jito — for real trades only (you can set this up later)
-
-```env
 JITO_AUTH_KEYPAIR=your_jito_searcher_keypair_base58
 JITO_BLOCK_ENGINE_URL=mainnet.block-engine.jito.wtf:443
 ```
 
-Jito is how the bot sends "all-or-nothing" trade bundles on Solana. You only need this working before live trading.
-
-**Generate a Jito keypair** (run from the project folder):
-
-```powershell
-node -e "const {Keypair}=require('@solana/web3.js'); const bs58=require('bs58'); const kp=Keypair.generate(); console.log('Private (put in .env):', bs58.encode(kp.secretKey)); console.log('Public (register on jito.wtf):', kp.publicKey.toBase58());"
-```
-
-Copy the **Private** line into `JITO_AUTH_KEYPAIR`.  
-Copy the **Public** line and register it at [jito.wtf/searcher](https://jito.wtf/searcher).
+- `BOT_WALLET_PRIVATE_KEY`: Private key in base58 format (export from Phantom: Settings → Security → Export Private Key).
+- `JITO_AUTH_KEYPAIR`: Keypair generated with `node -e "const {Keypair}=require('@solana/web3.js'); const bs58=require('bs58'); const kp=Keypair.generate(); console.log(bs58.encode(kp.secretKey));"`
 
 ---
 
-#### Execution settings — how aggressive the bot trades
+#### 4. Solana MEV Execution Settings
 
 ```env
 SIMULATION_MODE=true
@@ -310,54 +284,69 @@ JITO_TIP_RATIO=0.30
 COMPETITION_LEVEL=medium
 ```
 
-| Setting | Plain English | Keep as default? |
+| Setting | Plain English | Default |
 |---|---|---|
-| `SIMULATION_MODE=true` | **Fake money only** — no real trades | **Yes — keep true for now** |
-| `MIN_NET_PROFIT_BPS=20` | Only trade if profit is at least 0.20% after fees | Yes to start |
-| `DAILY_LOSS_LIMIT_USDC=100` | Stop trading if you lose $100 in one day | Adjust to your comfort |
-| `MAX_TRADE_CAPITAL_USDC=50` | Never use more than $50 per trade | Yes to start |
-| `JITO_TIP_RATIO=0.30` | Tip Jito 30% of expected profit | Yes to start |
-| `COMPETITION_LEVEL=medium` | How hard to compete for block space | `low`, `medium`, or `high` |
-
-**Basis points (bps) explained:** 20 bps = 0.20%. So the bot ignores tiny spreads that wouldn't cover fees.
+| `SIMULATION_MODE=true` | Paper trading only for Solana MEV | **Keep true for now** |
+| `MIN_NET_PROFIT_BPS=20` | Only trigger arbitrage if spread $\ge 0.20\%$ after fees | 20 |
+| `DAILY_LOSS_LIMIT_USDC=100` | Max daily loss for Solana MEV engine | 100 |
 
 ---
 
-#### API and dashboard — where you view the bot in a browser
+#### 5. THE GODFATHER Directional Engine Settings (Engine 2)
+
+```env
+DIRECTIONAL_ENABLED=true
+DIRECTIONAL_VENUE=hyperliquid
+DIRECTIONAL_TESTNET=true
+
+# Hyperliquid Configuration (Primary Native Venue)
+HYPERLIQUID_WALLET_PRIVATE_KEY=0x...
+HYPERLIQUID_VAULT_ADDRESS=
+
+# Bybit V5 Configuration (Secondary CEX Fallback)
+BYBIT_API_KEY=your_bybit_api_key
+BYBIT_API_SECRET=your_bybit_api_secret
+
+# Asset Activations & Parameters
+GODFATHER_BTC_ENABLED=true
+GODFATHER_SOL_ENABLED=true
+GODFATHER_BTC_SWEEP_MIN_USD=50.0
+GODFATHER_SOL_SWEEP_MIN_USD=0.50
+
+# Risk Management & Fractional Kelly
+GODFATHER_MAX_ACCOUNT_RISK_PCT=0.85
+GODFATHER_DAILY_LOSS_LIMIT_USD=450
+GODFATHER_MAX_CONSECUTIVE_LOSSES=2
+
+# 3-Tranche Execution Mechanics
+GODFATHER_TRANCHE1_PCT=25.0
+GODFATHER_TRANCHE2_PCT=35.0
+GODFATHER_TRANCHE3_PCT=40.0
+GODFATHER_CHANDELIER_ATR_MULT=3.0
+```
+
+| Setting | Options / Value | Meaning |
+|---|---|---|
+| `DIRECTIONAL_VENUE` | `hyperliquid` \| `bybit` \| `paper` | Which execution adapter routes BTC/SOL trades |
+| `DIRECTIONAL_TESTNET` | `true` \| `false` | When `true`, uses Hyperliquid testnet or Bybit testnet |
+| `HYPERLIQUID_WALLET_PRIVATE_KEY` | Hex Ethereum private key | EIP-712 Agent wallet used to sign orders without gas |
+| `GODFATHER_MAX_ACCOUNT_RISK_PCT` | `0.85` | 0.85% base equity risk per trade (Prop Firm mode) |
+| `GODFATHER_DAILY_LOSS_LIMIT_USD` | `450` | $450 daily loss ceiling on a $10,000 account (4.5% rule) |
+
+---
+
+#### 6. API, Dashboard, and Telegram Alerts
 
 ```env
 PORT=3001
 NEXT_PUBLIC_API_URL=http://localhost:3001
 LOG_LEVEL=info
 PROMETHEUS_PORT=9091
-```
-
-You can leave all of these as-is unless something else on your computer already uses port 3001 or 9091.
-
----
-
-#### Telegram — get alerts on your phone
-
-```env
 TELEGRAM_BOT_TOKEN=123456789:ABCDefGHiJklMnOpQrStUvWxYz
 TELEGRAM_ADMIN_CHAT_ID=123456789
 ```
 
-**Create your bot (5 minutes):**
-
-1. Open Telegram and search for **@BotFather**
-2. Send: `/newbot`
-3. Pick a name (e.g. "My MEV Bot")
-4. Pick a username (must end in `bot`, e.g. `my_mev_bot`)
-5. BotFather gives you a token like `7123456789:AAH...` — paste it as `TELEGRAM_BOT_TOKEN`
-
-**Get your chat ID:**
-
-1. Search for **@userinfobot** on Telegram
-2. Send it any message
-3. It replies with your ID number — paste that as `TELEGRAM_ADMIN_CHAT_ID`
-
-**One more thing:** Open your new bot in Telegram and send it `Hello`. Bots can't message you until you've started the chat first.
+- **Telegram setup:** Search `@BotFather` on Telegram, send `/newbot`, get token. Then message `@userinfobot` to get your numeric chat ID. Remember to message your new bot `Hello` once created!
 
 ---
 
@@ -365,20 +354,13 @@ TELEGRAM_ADMIN_CHAT_ID=123456789
 
 Save `.env` and close the editor. You're done with configuration.
 
-**If you miss a required setting**, the bot will tell you exactly which one:
-
-```
-Missing required environment variable: HELIUS_API_KEY
-Please set HELIUS_API_KEY in your .env file.
-```
-
-Just add it and restart.
-
 ---
 
-## Step 4 — Create the database tables
+## Step 4 — Create the database tables & run migrations
 
-The bot needs tables to store opportunities, simulations, and trades. One command does it all:
+The bot requires PostgreSQL tables to store Solana arbitrage opportunities, paper simulations, Godfather multi-TF candles, SMC signals, trade tranches, and trailing stops.
+
+One command executes all pending migrations:
 
 ```powershell
 pnpm migrate
@@ -387,58 +369,68 @@ pnpm migrate
 **You should see:**
 
 ```
-[migrate] Applied: 001_initial_schema.sql
-[migrate] All migrations applied
+[migrate] Connecting to PostgreSQL...
+[migrate] Applied migration: 001_initial_schema.sql (Solana MEV tables)
+[migrate] Applied migration: 002_godfather_schema.sql (Godfather candles, signals, trades, tranches)
+[migrate] All migrations applied successfully!
 ```
 
-**What just happened?** The bot created 7 tables in PostgreSQL. Running this again is safe — it won't duplicate anything.
+**What just happened?** The migration runner applied:
+1. `001_initial_schema.sql`: Created `pools`, `opportunities`, `simulations`, `execution_orders`, `daily_stats`, `simulation_stats`, and `bot_state`.
+2. `002_godfather_schema.sql`: Created `candles` (time-series with hypertable-ready indexes), `godfather_signals` (5-stage confluence records), `godfather_trades` (trade lifecycle), and `godfather_tranches` (individual tranche fills, breakeven tracking, and Chandelier trailing stop state).
 
-**Optional check** — see the tables yourself:
+**Optional verification:**
 
 ```powershell
 psql -U mev_user -d mev_research -h localhost -c "\dt"
 ```
 
-You should see names like `opportunities`, `simulations`, `execution_orders`.
-
-**If migration fails:**
-- Is PostgreSQL running? (`Get-Service -Name "postgresql*"`)
-- Is `DATABASE_URL` in `.env` correct?
-- Did you create `mev_user` and `mev_research` in Step 1d?
+You should see all 11 tables listed.
 
 ---
 
 ## Step 5 — Build the project
 
-This compiles all the TypeScript code into JavaScript the computer can run:
+Compile all 13 monorepo packages (TypeScript $\rightarrow$ JavaScript):
 
 ```powershell
 pnpm build
 ```
 
-Takes 1–2 minutes. **You should see** each package build without red error text.
+Takes 1–2 minutes. **You should see:** all 13 packages compiling cleanly with zero errors:
+- `@mev-research/shared`
+- `@mev-research/market-feed`
+- `@mev-research/spread-engine`
+- `@mev-research/execution` (including Hyperliquid & Bybit directional adapters)
+- `@mev-research/simulation`
+- `@mev-research/godfather-engine` (Indicators, Resamplers, SMC Detection, Risk Engine)
+- `@mev-research/database`
+- `@mev-research/analytics`
+- `@mev-research/monitoring`
+- `@mev-research/api`
+- `@mev-research/telegram`
+- `@mev-research/main`
+- `@mev-research/dashboard`
 
-**If build fails**, run this to find which package broke:
+**Run unit tests to verify the engine:**
 
 ```powershell
-npx tsc --noEmit --project packages/shared/tsconfig.json
+pnpm --filter @mev-research/godfather-engine test
 ```
 
-Fix that package's error, then try `pnpm build` again.
+**You should see:** `10/10 tests pass` covering Causal Resampling, ATR/CHOP, Fractal Sweeps, MSS/FVG triggers, and Kelly sizing!
 
 ---
 
-## Step 6 — Start the bot
+## Step 6 — Start the dual-engine bot
 
-### First time? Always use simulation mode.
+### First time? Use simulation mode & testnet.
 
-Check your `.env` has:
-
+Verify your `.env` has:
 ```env
 SIMULATION_MODE=true
+DIRECTIONAL_TESTNET=true
 ```
-
-This means the bot **watches real prices** but **doesn't spend real money**. Perfect for learning and testing.
 
 ### Start the bot
 
@@ -448,68 +440,67 @@ From the project root folder:
 pnpm start
 ```
 
-**Or for development** (easier to debug, runs TypeScript directly):
+**Or in development mode** (hot reloading):
 
 ```powershell
 pnpm dev
 ```
 
-### What a healthy startup looks like
+### What a healthy dual-engine startup looks like
 
-Read through your terminal output. You want to see ALL of these lines:
+You should see both engines initializing cleanly in your terminal:
 
 ```
-[STARTUP] Simulation mode: true          ← Good! No real money at risk
-[DB] Connection pool ready               ← Database connected
-[STARTUP] DB and Redis healthy           ← Both storage systems OK
-[Wallet] Address: Abc123...              ← Your wallet loaded
-[STARTUP] Market feed active             ← Getting live Solana data
-[SimRunner] Started — listening on ...   ← Simulation engine running
+[STARTUP] Dual-Engine Quantitative Fund Initializing...
+[DB] Connection pool ready (PostgreSQL 11 tables verified)
+[STARTUP] DB and Redis healthy
+[Wallet] Solana Keypair: Abc123... (Simulation: true)
+[STARTUP] Engine 1 (Solana MEV Arbitrage): ACTIVE
+[STARTUP] Market feed active (Yellowstone Geyser gRPC)
+[SimRunner] MEV Simulation engine running
+
+[Godfather] ========================================
+[Godfather] THE GODFATHER Directional Engine v2.0
+[Godfather] Primary Venue: Hyperliquid L1 (Testnet: true)
+[Godfather] Secondary Venue: Bybit V5 (UTA Fallback)
+[Godfather] Active Pairs: BTCUSD, SOLUSD
+[Godfather] Multi-TF Causal Resampler: M1 -> M5, M15, H1, H4
+[Godfather] Confluence Rules: 5-Stage Sweep & FVG Retest
+[Godfather] Sizing: Tiered Conviction (Unicorn 2.4x / Normal 1.0x)
+[Godfather] Execution: 3-Tranche (25% @ 1R, 35% @ 2R, 40% Moonbag)
+[Godfather] ========================================
+
 [API] Server listening on http://localhost:3001
 [Monitoring] Prometheus metrics at http://localhost:9091/metrics
-[STARTUP] All systems go
-[STARTUP] SIMULATION MODE — no real capital at risk
+[Telegram] Bot active & listening for commands
+[STARTUP] All systems go — NO REAL CAPITAL AT RISK
 ```
-
-**If anything is missing or red**, jump to [Troubleshooting](#troubleshooting--when-something-goes-wrong) at the bottom.
 
 ### How to stop the bot safely
 
-Press **Ctrl+C** once in the terminal. Wait for:
-
-```
-[SHUTDOWN] Clean exit
-```
-
-Don't force-close the window — let it shut down cleanly.
+Press **Ctrl+C** once. The bot will cleanly close database connections, persist all trade states to PostgreSQL, and shutdown without dropping orders.
 
 ---
 
 ## Step 7 — Open the dashboard
 
-The dashboard is a website on your computer where you can see wallet balance, orders, and simulation results.
+The dashboard provides a Next.js 14 real-time interface with dark-mode institutional UI.
 
-**Leave the bot running** in Terminal 1. Open a **new** PowerShell window (Terminal 2):
+Open a **new** PowerShell window (Terminal 2):
 
 ```powershell
-cd solana-arbitrage-bot\apps\dashboard
+cd apps/dashboard
 pnpm dev
 ```
 
-**You should see:**
+Open your browser and navigate to: **http://localhost:3000**
 
-```
-▲ Next.js 14.x.x
-- Local: http://localhost:3000
-```
-
-Open your browser and go to: **http://localhost:3000**
-
-| Page | What you'll see |
+| Route | What you'll see |
 |---|---|
-| Home (`/`) | Links to Execution and Simulation |
-| Execution (`/execution`) | Live orders, wallet, kill switch status |
-| Simulation (`/simulation`) | Paper trading results |
+| **Overview (`/`)** | Fund overview, dual-engine status, aggregate PnL, system health |
+| **MEV Execution (`/execution`)** | Solana live orders, DEX pool spreads, wallet balances, kill switch |
+| **MEV Simulation (`/simulation`)** | Paper-trading stats, win rate, Gaussian latency distributions |
+| **GODFATHER (`/godfather`)** | Live BTCUSD & SOLUSD multi-TF candle charts, real-time 5-stage confluence scanner, active 3-tranche trades, Chandelier trailing stop levels, and execution logs |
 
 **If the page says "Loading..." forever:**
 - Make sure the bot is still running in Terminal 1
@@ -519,26 +510,34 @@ Open your browser and go to: **http://localhost:3000**
 
 ## Step 8 — Test that everything works
 
-Work through this list like a checklist. Put a ✓ next to each one as you go.
+Work through this checklist to verify that all systems are healthy.
 
 ### On your computer
 
 ```powershell
-# 1. Database is alive
-psql -U mev_user -d mev_research -h localhost -c "SELECT COUNT(*) FROM _migrations;"
-# ✓ Should show: count = 1
+# 1. Database is alive and both migrations applied
+psql -U mev_user -d mev_research -h localhost -c "SELECT name FROM _migrations ORDER BY id;"
+# ✓ Should show: 001_initial_schema.sql AND 002_godfather_schema.sql (count = 2)
 
 # 2. Redis is alive
 redis-cli ping
 # ✓ Should show: PONG
 
-# 3. API is alive
+# 3. Master API is alive
 curl http://localhost:3001/health
 # ✓ Should show: {"status":"ok",...}
 
-# 4. Bot status (wallet + simulation mode)
+# 4. Engine 1 MEV status (wallet + simulation mode)
 curl http://localhost:3001/api/v1/execution/status
-# ✓ Should show: killSwitchActive, simulationMode, wallet balances
+# ✓ Should show: killSwitchActive: false, simulationMode: true, wallet balances
+
+# 5. Engine 2 GODFATHER directional status & signals
+curl http://localhost:3001/api/v1/godfather/signals
+# ✓ Should return recent BTCUSD/SOLUSD confluence signals array []
+
+# 6. Run automated test suite
+pnpm --filter @mev-research/godfather-engine test
+# ✓ Should show: 10/10 tests passed (Causal Resampler, ATR/CHOP, Fractal Sweeps, Kelly Sizer)
 ```
 
 ### On Telegram
@@ -547,33 +546,43 @@ Open your bot and try these commands one by one:
 
 | Send this | What should happen |
 |---|---|
-| `/wallet` | Bot replies with your SOL and USDC balance |
-| `/orders` | Bot replies with recent orders (may be empty — that's OK) |
-| `/pnl` | Bot replies with profit/loss summary |
-| `/kill` | Bot says kill switch is ON (trading paused) |
-| `/resume` | Bot says kill switch is OFF (trading allowed) |
+| `/wallet` | Bot replies with your Solana balance (SOL/USDC) and Hyperliquid margin |
+| `/orders` | Bot replies with recent MEV orders |
+| `/godfather` | Bot replies with active BTCUSD & SOLUSD positions and trailing stop levels |
+| `/pnl` | Bot replies with aggregate fund profit/loss summary |
+| `/kill` | Bot sets Redis kill switch ON (pauses both MEV and Godfather trading instantly) |
+| `/resume` | Bot sets kill switch OFF (trading resumed) |
 
 **If the bot doesn't reply:** Did you send it a message first to start the chat? Is `TELEGRAM_BOT_TOKEN` correct?
 
-### Watch the bot work (simulation)
+### Watch the bot work (dual-engine simulation)
 
-With the bot running, stare at Terminal 1 for a few minutes. When market prices diverge between DEXs, you'll see lines like:
+With the bot running, stare at Terminal 1 for a few minutes. You will see both engines generating intelligence:
 
+**Engine 1 (MEV Arbitrage):**
 ```
 [SpreadEngine] Opportunity: SOL/USDC | net 25.3bps | confidence 72 | latency 2ms
 ```
 
-That means the bot found a price difference and is paper-trading it. No real money moves.
-
-After about 60 seconds, check simulation stats:
-
-```powershell
-redis-cli GET mev:simulation:stats
+**Engine 2 (The GODFATHER Directional Scalper):**
+```
+[Godfather] [BTCUSD] M15 Liquidity Sweep: Breach +$62.40 > $50.00 min threshold!
+[Godfather] [BTCUSD] Delta Absorption detected: Reclaim delta +42.1 BTC > Sweep delta -38.5 BTC
+[Godfather] [BTCUSD] Displacement Candle validated (Body $142.00 >= 0.60 ATR)
+[Godfather] [BTCUSD] MSS confirmed! Bullish FVG formed [$68,420.00 - $68,455.00]
+[Godfather] [BTCUSD] Grade A+ Unicorn Setup! Kelly Multiplier: 2.40x
+[Godfather] [BTCUSD] Placed Post-Only Buy Limit on Hyperliquid @ $68,455.00
 ```
 
-You'll see JSON with `totalSimulated`, `winRate`, etc.
+After running for a while, check simulation and performance stats:
 
-**No opportunities showing up?** That's normal during quiet markets. As long as startup logs look healthy, the bot is working — it's just waiting for spreads.
+```powershell
+# Solana MEV paper stats
+redis-cli GET mev:simulation:stats
+
+# Godfather live signals and trades via API
+curl http://localhost:3001/api/v1/godfather/trades
+```
 
 ---
 
@@ -581,35 +590,39 @@ You'll see JSON with `totalSimulated`, `winRate`, etc.
 
 **Stop. Read this entire section before changing anything.**
 
-Simulation mode exists so you can prove the bot works before risking money. The bot itself will recommend when to go live based on results.
+Simulation mode and testnet exist so you can prove both engines work before risking money.
 
 ### Checklist — every box must be ticked
 
-- [ ] Bot ran in simulation for **at least 72 hours** (3 full days)
-- [ ] **500+ simulations** completed (check `totalSimulated` in Redis stats)
-- [ ] **Win rate is 60% or higher**
-- [ ] **Average profit is positive** after fees
-- [ ] Wallet has **at least $50 USDC** for trading
-- [ ] Wallet has **at least 0.1 SOL** for transaction fees
-- [ ] `DAILY_LOSS_LIMIT_USDC` is set to something you can afford to lose
-- [ ] You tested `/kill` on Telegram and it worked
-- [ ] Dashboard shows the correct wallet balance
+- [ ] Dual-engine ran in simulation / testnet for **at least 72 hours** (3 full days)
+- [ ] **500+ MEV simulations** completed (`mev:simulation:stats`) with win rate $\ge 60\%$
+- [ ] **20+ Godfather testnet trades** executed with positive net expectancy
+- [ ] Solana wallet has **at least $50 USDC** and **0.1 SOL** for gas/tips
+- [ ] Hyperliquid or Bybit account funded with intended risk capital
+- [ ] `DAILY_LOSS_LIMIT_USDC` and `GODFATHER_DAILY_LOSS_LIMIT_USD` set to amounts you can afford to lose
+- [ ] You tested `/kill` on Telegram and verified both engines halted trading
+- [ ] Dashboard shows correct wallet and margin balances on both `/execution` and `/godfather`
 - [ ] Jito keypair is registered at [jito.wtf/searcher](https://jito.wtf/searcher)
 
 ### Flip the switch (only when ready)
 
-In `.env`, change one line:
+In `.env`, update to production settings:
 
 ```env
+# Engine 1 Live MEV
 SIMULATION_MODE=false
+
+# Engine 2 Live Godfather
+DIRECTIONAL_TESTNET=false
+DIRECTIONAL_VENUE=hyperliquid  # or bybit
 ```
 
-Save, restart the bot (`Ctrl+C`, then `pnpm start` again).
+Save and restart the bot (`Ctrl+C`, then `pnpm start` again).
 
 **You should now see:**
 
 ```
-[STARTUP] ⚠️  LIVE TRADING MODE — real capital at risk
+[STARTUP] ⚠️  LIVE TRADING MODE — real capital at risk on Solana & Hyperliquid
 ```
 
 Real money is now at stake. Keep Telegram open and know how to `/kill`.
@@ -620,37 +633,39 @@ Real money is now at stake. Keep Telegram open and know how to `/kill`.
 
 Every time you want to run the bot:
 
-**Terminal 1 — the bot:**
+**Terminal 1 — the dual-engine bot:**
 ```powershell
-cd solana-arbitrage-bot
 pnpm start
 ```
 
-**Terminal 2 — the dashboard:**
+**Terminal 2 — the Next.js dashboard:**
 ```powershell
-cd solana-arbitrage-bot\apps\dashboard
+cd apps/dashboard
 pnpm dev
 ```
 
-**Then open:** http://localhost:3000
+**Then open:**
+- Main Dashboard: http://localhost:3000
+- MEV Engine: http://localhost:3000/execution
+- Godfather Engine: http://localhost:3000/godfather
 
 ### How to check on things
 
 | I want to know... | Do this |
 |---|---|
-| Is the bot running OK? | Look at Terminal 1 for errors |
-| What's my wallet balance? | Telegram `/wallet` or dashboard |
-| Recent trades | Telegram `/orders` or dashboard |
+| Is the bot running OK? | Look at Terminal 1 for logs |
+| What's my wallet / margin balance? | Telegram `/wallet` or dashboard |
+| Recent MEV & Godfather trades | Telegram `/orders`, `/godfather`, or dashboard |
 | Profit today | Telegram `/pnl` |
-| Simulation performance | `redis-cli GET mev:simulation:stats` |
-| Technical metrics | Open http://localhost:9091/metrics |
+| MEV simulation stats | `redis-cli GET mev:simulation:stats` |
+| Prometheus metrics | Open http://localhost:9091/metrics |
 
 ### Emergency — stop everything NOW
 
 Pick the fastest option available:
 
-1. **Telegram** → send `/kill` to your bot (pauses trading instantly)
-2. **Keyboard** → press `Ctrl+C` in the bot terminal (stops everything)
+1. **Telegram** → send `/kill` to your bot (pauses all trading on both engines instantly)
+2. **Keyboard** → press `Ctrl+C` in Terminal 1 (cleanly closes all connections and exits)
 
 ---
 
@@ -662,126 +677,80 @@ Don't panic. Most problems are a missing setting or a service that isn't running
 
 ### "Missing required environment variable: XXXXX"
 
-**What it means:** Your `.env` file is missing a setting.
-
-**Fix:**
-1. Open `.env`
-2. Find the variable named in the error (e.g. `HELIUS_API_KEY`)
-3. Fill it in
-4. Save and restart the bot
+**Fix:** Open `.env`, check `.env.example` for the missing variable, fill it in, save, and restart.
 
 ---
 
 ### "PostgreSQL health check failed"
 
-**What it means:** The bot can't reach your database.
-
-**Fix — try each until one works:**
-
 ```powershell
-# Is PostgreSQL running?
+# Is PostgreSQL service running?
 Get-Service -Name "postgresql*"
-# If Stopped → Start-Service postgresql-x64-16
+# If Stopped: Start-Service postgresql-x64-16
 
 # Can you connect manually?
 psql -U mev_user -d mev_research -h localhost -c "SELECT 1;"
-
-# Is DATABASE_URL correct in .env?
-# Should look like: postgresql://mev_user:mev_pass@localhost:5432/mev_research
 ```
 
 ---
 
 ### "Redis health check failed"
 
-**What it means:** Redis isn't running or the URL is wrong.
-
-**Fix:**
-
 ```powershell
 redis-cli ping
 ```
-
-- If it fails → start Memurai (Windows) or `brew services start redis` (Mac)
-- Check `.env` has `REDIS_URL=redis://localhost:6379`
+- If it fails, start Memurai (Windows) or `brew services start redis` (Mac).
+- Ensure `.env` has `REDIS_URL=redis://localhost:6379`.
 
 ---
 
-### "pnpm install" warnings about build scripts
-
-**Fix:**
+### "Migration error: relation already exists or migration failed"
 
 ```powershell
-pnpm install --dangerously-allow-all-builds
+# Check applied migrations
+psql -U mev_user -d mev_research -h localhost -c "SELECT * FROM _migrations;"
+# Run migrations again (safe and idempotent)
+pnpm migrate
 ```
-
----
-
-### Wallet shows 0 SOL and 0 USDC
-
-**Possible reasons:**
-1. `BOT_WALLET_PRIVATE_KEY` is wrong — re-export from your wallet
-2. The wallet genuinely has no funds — send some SOL/USDC to the address shown in startup logs
-3. Helius RPC isn't responding — check your API key and plan
 
 ---
 
 ### Telegram bot ignores me
 
-1. **Did you message the bot first?** Open it in Telegram and send `Hello` before expecting replies
-2. **Is the token correct?** Copy fresh from @BotFather — no extra spaces
-3. **Is the chat ID correct?** Get it again from @userinfobot
-4. **Is the bot process running?** Look for `[STARTUP] Telegram bot active` in Terminal 1
+1. Did you start the conversation first by sending `Hello` to the bot?
+2. Did you set both `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ADMIN_CHAT_ID`?
+3. Check Terminal 1 logs for `[Telegram] Bot active`.
 
 ---
 
 ### Dashboard stuck on "Loading..."
 
-1. Is the bot running? (`pnpm start` in Terminal 1)
-2. Does http://localhost:3001/health work in your browser?
-3. Is `NEXT_PUBLIC_API_URL=http://localhost:3001` in `.env`?
-4. Restart the dashboard after changing `.env`
-
----
-
-### No opportunities appearing
-
-This is **usually normal**, not a bug. Arbitrage opportunities come and go with market volatility.
-
-**The bot IS working if you see:**
-- `[STARTUP] Market feed active`
-- No constant error/reconnect messages
-- `[SimRunner] Started`
-
-**Check if gRPC is configured correctly:**
-- `HELIUS_GRPC_URL` must be `domain:port` with **no** `https://`
-- Example: `mainnet.helius-rpc.com:443`
+1. Is the backend API running on port 3001? Check `http://localhost:3001/health`.
+2. Ensure `NEXT_PUBLIC_API_URL=http://localhost:3001` in your `.env`.
 
 ---
 
 ## Quick cheat sheet
 
-Copy this block — it's everything in one place:
+Copy this block — everything you need in one place:
 
 ```powershell
 # === FIRST TIME SETUP ===
 pnpm install
-Copy-Item .env.example .env     # then fill in every value
-pnpm migrate                    # create database tables
-pnpm build                      # compile the code
+Copy-Item .env.example .env     # fill in your API keys & wallets
+pnpm migrate                    # create all 11 PostgreSQL tables (MEV + Godfather)
+pnpm build                      # compile all 13 monorepo packages
+pnpm --filter @mev-research/godfather-engine test # verify 10/10 tests pass
 
 # === EVERY TIME YOU RUN ===
-pnpm start                      # Terminal 1: start the bot
-cd apps/dashboard; pnpm dev     # Terminal 2: start the dashboard
-
-# === USEFUL CHECKS ===
-redis-cli ping
-redis-cli GET mev:simulation:stats
-curl http://localhost:3001/api/v1/execution/status
+pnpm start                      # Terminal 1: start dual-engine fund bot
+cd apps/dashboard; pnpm dev     # Terminal 2: start Next.js 14 dashboard
 
 # === OPEN IN BROWSER ===
-# Dashboard:    http://localhost:3000
-# API health:   http://localhost:3001/health
+# Overview:     http://localhost:3000
+# Godfather:    http://localhost:3000/godfather
+# Execution:    http://localhost:3000/execution
+# Health:       http://localhost:3001/health
 # Metrics:      http://localhost:9091/metrics
 ```
 
@@ -789,12 +758,12 @@ curl http://localhost:3001/api/v1/execution/status
 
 ## Keep your setup safe
 
-- **Never** put `.env` on GitHub or share it with anyone
-- **Never** share `BOT_WALLET_PRIVATE_KEY` — anyone with it can steal your funds
-- **Always** start with `SIMULATION_MODE=true`
-- Use a **dedicated wallet** with only the money you're willing to risk
-- Set `DAILY_LOSS_LIMIT_USDC` to an amount you can afford to lose
-- Test `/kill` on Telegram before going live — it's your emergency brake
+- **Never** commit `.env` to GitHub or share it with anyone.
+- **Never** share `BOT_WALLET_PRIVATE_KEY` or `HYPERLIQUID_WALLET_PRIVATE_KEY`.
+- **Always** start with `SIMULATION_MODE=true` and `DIRECTIONAL_TESTNET=true`.
+- Use **dedicated wallets/accounts** with only funds allocated to trading.
+- Always maintain daily loss limits (`DAILY_LOSS_LIMIT_USDC`, `GODFATHER_DAILY_LOSS_LIMIT_USD`).
+- Test `/kill` on Telegram before live trading — it is your immediate emergency brake.
 
 ---
 

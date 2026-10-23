@@ -1,21 +1,25 @@
-﻿{
-    "name":  "@mev-research/execution",
-    "version":  "1.0.0",
-    "main":  "dist/index.js",
-    "types":  "dist/index.d.ts",
-    "scripts":  {
-                    "build":  "tsc"
-                },
-    "dependencies":  {
-    "@solana/web3.js": "1.98.4",
-                         "bs58":  "^5.0.0",
-                         "jito-ts":  "^3.0.0",
-                         "@mev-research/shared":  "workspace:*",
-                         "@mev-research/database":  "workspace:*",
-                         "winston":  "^3.11.0"
-                     },
-    "devDependencies":  {
-                            "typescript":  "^5.3.3",
-                            "@types/node":  "^20.11.0"
-                        }
+{
+    "name": "@mev-research/execution",
+    "version": "1.0.0",
+    "main": "dist/index.js",
+    "type": "module",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "test": "node --test --experimental-strip-types test/unit-tests.ts"
+    },
+    "dependencies": {
+        "@mev-research/database": "workspace:*",
+        "@mev-research/shared": "workspace:*",
+        "@solana/web3.js": "1.98.4",
+        "bs58": "^5.0.0",
+        "bybit-api": "^4.8.2",
+        "jito-ts": "^3.0.0",
+        "viem": "^2.57.10",
+        "winston": "^3.11.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.0",
+        "typescript": "^5.3.3"
+    }
 }

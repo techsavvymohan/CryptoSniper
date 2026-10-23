@@ -1,0 +1,19 @@
+{
+  "name": "@mev-research/godfather-engine",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test --experimental-strip-types test/unit-tests.ts"
+  },
+  "dependencies": {
+    "@mev-research/shared": "workspace:*",
+    "@mev-research/market-feed": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.11.0"
+  }
+}

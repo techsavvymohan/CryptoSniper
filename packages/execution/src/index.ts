@@ -5,3 +5,5 @@ export * from './builders/index.js';
 export * from './jito/jito-submitter.js';
 export * from './risk/risk-engine.js';
 export * from './engine/execution-engine.js';
+export * from './directional/index.js';
+

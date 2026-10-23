@@ -1,11 +1,7 @@
 import Redis from 'ioredis';
+import { CHANNELS } from '@mev-research/shared';
 
-export const CHANNELS = {
-  OPPORTUNITIES: 'mev:opportunities',
-  POOL_UPDATES: 'mev:pools',
-  ALERTS: 'mev:alerts',
-} as const;
-
+export { CHANNELS };
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];
 export type MessageHandler = (channel: string, data: unknown) => void;
 

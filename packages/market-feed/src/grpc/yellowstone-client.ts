@@ -1,12 +1,19 @@
 import { EventEmitter } from 'events';
-import Client, { CommitmentLevel, SubscribeRequest } from '@triton-one/yellowstone-grpc';
+import YellowstoneModule, { CommitmentLevel, SubscribeRequest } from '@triton-one/yellowstone-grpc';
 import type { ClientDuplexStream } from '@grpc/grpc-js';
 import type { SubscribeUpdate } from '@triton-one/yellowstone-grpc';
+
+// Handle CJS/ESM interop for Client constructor
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const YellowstoneGrpcClient: any = (YellowstoneModule as any).default ?? YellowstoneModule;
 
 export interface AccountUpdate {
   pubkey: string;
   data: Buffer;
   slot: number;
+  writeVersion?: number;
+  region?: string;
+  receivedAt?: number;
 }
 
 export declare interface YellowstoneClient {
@@ -17,7 +24,8 @@ export declare interface YellowstoneClient {
 }
 
 export class YellowstoneClient extends EventEmitter {
-  private client: Client;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private client: any;
   private stream?: ClientDuplexStream<SubscribeRequest, SubscribeUpdate>;
   private subscribeRequest?: SubscribeRequest;
   private reconnectAttempt = 0;
@@ -32,7 +40,7 @@ export class YellowstoneClient extends EventEmitter {
     const grpcUrl = endpoint.startsWith('http')
       ? endpoint
       : `https://${endpoint.replace(/^https?:\/\//, '')}`;
-    this.client = new Client(grpcUrl, authToken, undefined);
+    this.client = new YellowstoneGrpcClient(grpcUrl, authToken, undefined);
   }
 
   async start(accounts: string[]): Promise<void> {
@@ -66,11 +74,12 @@ export class YellowstoneClient extends EventEmitter {
   private async connect(): Promise<void> {
     try {
       // subscribe() returns a Promise<ClientDuplexStream>
-      this.stream = await this.client.subscribe();
+      const stream = await this.client.subscribe();
+      this.stream = stream;
       this.reconnectAttempt = 0;
       this.emit('connected');
 
-      this.stream.on('data', (data: SubscribeUpdate) => {
+      stream.on('data', (data: SubscribeUpdate) => {
         try {
           this.handleUpdate(data);
         } catch {
@@ -78,19 +87,19 @@ export class YellowstoneClient extends EventEmitter {
         }
       });
 
-      this.stream.on('error', (err: Error) => {
+      stream.on('error', (err: Error) => {
         this.emit('error', err);
         this.scheduleReconnect();
       });
 
-      this.stream.on('end', () => {
+      stream.on('end', () => {
         this.emit('disconnected');
         this.scheduleReconnect();
       });
 
       if (this.subscribeRequest) {
         await new Promise<void>((resolve, reject) => {
-          this.stream!.write(this.subscribeRequest!, (err: unknown) => {
+          stream.write(this.subscribeRequest!, (err: unknown) => {
             if (err) reject(err as Error);
             else resolve();
           });
@@ -137,10 +146,16 @@ export class YellowstoneClient extends EventEmitter {
       ? encodeBase58(pubkey as Buffer)
       : String(pubkey);
 
+    const rawWriteVersion = account['writeVersion'];
+    const writeVersion = rawWriteVersion !== undefined
+      ? Number(rawWriteVersion)
+      : undefined;
+
     this.emit('accountUpdate', {
       pubkey: pubkeyStr,
       data: dataBuffer,
       slot: Number(slot),
+      writeVersion,
     } satisfies AccountUpdate);
   }
 }

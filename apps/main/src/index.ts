@@ -3,7 +3,7 @@ import path from 'path';
 
 // Load .env from monorepo root (dist/ → apps/main → apps → root)
 loadDotenv({ path: path.resolve(__dirname, '..', '..', '..', '.env') });
-import { loadConfig, CHANNELS, heliusRpcUrl, isHeliusConfigured } from '@mev-research/shared';
+import { loadConfig, CHANNELS, heliusRpcUrl, isHeliusConfigured, ArbitrageOpportunity } from '@mev-research/shared';
 import {
   connect as dbConnect,
   disconnect as dbDisconnect,
@@ -21,6 +21,7 @@ import {
   StatisticsRepository,
   PoolRepository,
   LatencyRepository,
+  GodfatherRepository,
   db,
 } from '@mev-research/database';
 import {
@@ -30,8 +31,14 @@ import {
   JitoSubmitter,
   RiskEngine,
   ExecutionEngine,
+  createDirectionalExecutor,
 } from '@mev-research/execution';
-import { MarketFeedService } from '@mev-research/market-feed';
+import {
+  MarketFeedService,
+  CryptoCandleFeedService,
+  HyperliquidFootprintService,
+} from '@mev-research/market-feed';
+import { GodfatherEngine } from '@mev-research/godfather-engine';
 import { OpportunityManager } from '@mev-research/spread-engine';
 import { SimulationEngine, SimulationRunner } from '@mev-research/simulation';
 import { AnalyticsService } from '@mev-research/analytics';
@@ -63,6 +70,7 @@ async function main() {
   const statisticsRepo = new StatisticsRepository(pool);
   const poolRepo = new PoolRepository(pool);
   const latencyRepo = new LatencyRepository(pool);
+  const godfatherRepo = new GodfatherRepository(pool);
 
   // ─── Execution Layer ─────────────────────────────────────────────────────────
   const rpcUrl = isHeliusConfigured(config.helius.apiKey)
@@ -106,7 +114,7 @@ async function main() {
     config.execution.minNetProfitBps,
   );
 
-  opportunityManager.onOpportunity(async (opp) => {
+  opportunityManager.onOpportunity(async (opp: ArbitrageOpportunity) => {
     // Publish to Redis for simulation runner and other consumers
     await publish(CHANNELS.OPPORTUNITIES, { type: 'OPPORTUNITY_DETECTED', payload: opp });
 
@@ -121,7 +129,23 @@ async function main() {
   let marketFeed: MarketFeedService | null = null;
 
   if (isHeliusConfigured(config.helius.apiKey)) {
-    marketFeed = new MarketFeedService(config.helius.grpcUrl, config.helius.apiKey);
+    const multiRegionConfig = config.helius.multiRegionEnabled
+      ? {
+          enabled: true,
+          regions: [
+            { id: 'AMS', name: 'Amsterdam (Europe)', endpoint: config.helius.grpcAms ?? 'amsterdam.helius-rpc.com:443' },
+            { id: 'TYO', name: 'Tokyo (Asia)', endpoint: config.helius.grpcTyo ?? 'tokyo.helius-rpc.com:443' },
+            { id: 'EWR', name: 'New York (US East)', endpoint: config.helius.grpcEwr ?? 'mainnet.helius-rpc.com:443' },
+          ],
+        }
+      : undefined;
+
+    marketFeed = new MarketFeedService(
+      config.helius.grpcUrl,
+      config.helius.apiKey,
+      [],
+      multiRegionConfig,
+    );
     marketFeed.onPoolUpdate(snapshot => {
       opportunityManager.updatePool(snapshot);
       poolRepo.insert(snapshot).catch(() => { /* non-critical */ });
@@ -129,7 +153,9 @@ async function main() {
     });
     try {
       await marketFeed.start();
-      console.log('[STARTUP] Market feed active');
+      console.log(
+        `[STARTUP] Market feed active (${config.helius.multiRegionEnabled ? 'Multi-Region Geyser: AMS, TYO, EWR' : 'Single Region'})`,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.warn('[STARTUP] Market feed failed to start:', message);
@@ -142,6 +168,81 @@ async function main() {
   // ─── Simulation Runner ────────────────────────────────────────────────────────
   const simRunner = new SimulationRunner(simulationRepo, config.redis.url, config.execution.maxTradeCapitalUsdc);
   await simRunner.start();
+
+  // ─── Engine 2: The GODFATHER Directional Scalper ─────────────────────────────
+  let godfatherEngine: GodfatherEngine | null = null;
+  let candleFeed: CryptoCandleFeedService | null = null;
+  let footprintService: HyperliquidFootprintService | null = null;
+  let directionalExecutor: ReturnType<typeof createDirectionalExecutor> | null = null;
+
+  if (config.godfather && config.godfather.enabled) {
+    const gfConfig = config.godfather;
+    directionalExecutor = createDirectionalExecutor(gfConfig);
+    await directionalExecutor.initialize();
+
+    if (gfConfig.footprintEnabled) {
+      footprintService = new HyperliquidFootprintService({
+        wsUrl: gfConfig.hyperliquidWsUrl,
+        symbols: gfConfig.symbols,
+        rollingWindowSecs: gfConfig.footprintRollingWindowSecs,
+        obiDepth: gfConfig.obiDepth,
+      });
+      await footprintService.start();
+      console.log(
+        `[STARTUP] 👣 Sub-Second Hyperliquid Footprint Service active on symbols: ${gfConfig.symbols.join(', ')}`,
+      );
+    }
+
+    candleFeed = new CryptoCandleFeedService(gfConfig.symbols);
+    godfatherEngine = new GodfatherEngine(
+      gfConfig,
+      candleFeed.getResampler(),
+      godfatherRepo,
+      config.execution.maxTradeCapitalUsdc,
+      directionalExecutor,
+      footprintService ?? undefined,
+    );
+
+    candleFeed.on('candle', (resample) => {
+      godfatherEngine?.onCandleUpdate(resample).catch(err => {
+        console.error('[Godfather] Candle processing error:', err.message);
+      });
+    });
+
+    godfatherEngine.on('signal', async (signal) => {
+      console.log(`[Godfather] 🎩 Signal: ${signal.grade} ${signal.direction} on ${signal.symbol} at $${signal.entryPrice} (Risk: $${signal.allocatedRiskUsd.toFixed(2)})`);
+      await publish(CHANNELS.GODFATHER_SIGNALS, signal);
+    });
+
+    godfatherEngine.on('trade_opened', async (trade) => {
+      console.log(`[Godfather] 🚀 Trade Opened: ${trade.direction} ${trade.symbol} | Size: ${trade.totalSize} | Entry: $${trade.entryPrice} | SL: $${trade.stopLoss}`);
+      await publish(CHANNELS.GODFATHER_TRADES, { type: 'TRADE_OPENED', payload: trade });
+    });
+
+    godfatherEngine.on('tranche_exit', async ({ trade, result }) => {
+      console.log(`[Godfather] 🎯 Tranche Update: ${trade.symbol} ${result.action} (${result.message}) | PnL: +$${result.realizedPnlDeltaUsd.toFixed(2)}`);
+      await publish(CHANNELS.GODFATHER_TRADES, { type: 'TRANCHE_EXIT', payload: { trade, result } });
+    });
+
+    godfatherEngine.on('trade_closed', async (trade) => {
+      console.log(`[Godfather] 🏁 Trade Closed: ${trade.symbol} ${trade.direction} | Exit: ${trade.exitReason} | Realized PnL: $${trade.realizedPnlUsd.toFixed(2)}`);
+      await publish(CHANNELS.GODFATHER_TRADES, { type: 'TRADE_CLOSED', payload: trade });
+    });
+
+    godfatherEngine.on('alert', (msg) => {
+      console.warn('[Godfather] Alert:', msg);
+    });
+
+    try {
+      await godfatherEngine.start();
+      await candleFeed.start();
+      console.log(`[STARTUP] 🎩 Godfather Directional Scalper active on symbols: ${gfConfig.symbols.join(', ')} [Venue: ${gfConfig.venue.toUpperCase()}]`);
+    } catch (err) {
+      console.error('[STARTUP] Failed to start Godfather Engine:', err);
+    }
+  } else {
+    console.log('[STARTUP] Godfather Engine disabled in config');
+  }
 
   // ─── Analytics ───────────────────────────────────────────────────────────────
   const analyticsService = new AnalyticsService({
@@ -158,6 +259,7 @@ async function main() {
     riskEngine,
     executionRepo,
     config.redis.url,
+    godfatherRepo,
   );
   console.log('[STARTUP] Telegram bot active');
 
@@ -167,6 +269,8 @@ async function main() {
     walletManager,
     riskEngine,
     config.api.port,
+    godfatherRepo,
+    godfatherEngine,
   );
 
   // ─── Prometheus Metrics ──────────────────────────────────────────────────────
@@ -182,6 +286,10 @@ async function main() {
   // ─── Graceful Shutdown ───────────────────────────────────────────────────────
   const shutdown = async () => {
     console.log('[SHUTDOWN] Stopping...');
+    godfatherEngine?.stop();
+    candleFeed?.stop();
+    footprintService?.stop();
+    await directionalExecutor?.stop();
     simRunner.stop();
     analyticsService.stopScheduler();
     marketFeed?.stop();

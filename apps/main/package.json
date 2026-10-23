@@ -17,6 +17,7 @@
     "@mev-research/telegram": "workspace:*",
     "@mev-research/api": "workspace:*",
     "@mev-research/monitoring": "workspace:*",
+    "@mev-research/godfather-engine": "workspace:*",
     "dotenv": "^16.4.5"
   },
   "devDependencies": {

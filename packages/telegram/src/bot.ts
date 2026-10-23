@@ -1,9 +1,10 @@
 import TelegramBot, { InlineKeyboardMarkup } from 'node-telegram-bot-api';
 import Redis from 'ioredis';
 import { WalletManager, RiskEngine } from '@mev-research/execution';
-import { ExecutionRepository } from '@mev-research/database';
+import { ExecutionRepository, GodfatherRepository } from '@mev-research/database';
+import type { GodfatherTrade } from '@mev-research/shared';
 
-type BotAction = 'wallet' | 'orders' | 'pnl' | 'alerts' | 'kill' | 'resume' | 'menu' | 'status';
+type BotAction = 'wallet' | 'orders' | 'pnl' | 'alerts' | 'kill' | 'resume' | 'menu' | 'status' | 'godfather';
 
 export class TelegramAlertBot {
   private bot: TelegramBot;
@@ -16,7 +17,8 @@ export class TelegramAlertBot {
     private walletManager: WalletManager,
     private riskEngine: RiskEngine,
     private executionRepo: ExecutionRepository,
-    redisUrl: string
+    redisUrl: string,
+    private godfatherRepo?: GodfatherRepository,
   ) {
     this.bot = new TelegramBot(token, { polling: true });
     this.redis = new Redis(redisUrl);
@@ -43,6 +45,7 @@ export class TelegramAlertBot {
     const row2 = [
       { text: '💰 P&L', callback_data: 'action:pnl' },
       { text: '📊 Status', callback_data: 'action:status' },
+      { text: '🎩 Godfather', callback_data: 'action:godfather' },
     ];
     const row3 = [
       { text: '🔔 Alerts', callback_data: 'action:alerts' },
@@ -67,7 +70,7 @@ export class TelegramAlertBot {
 Mode: ${simulation ? '🔵 SIMULATION' : '🔴 LIVE'}
 Tap a button below or use commands.
 
-/wallet /orders /pnl /alerts
+/wallet /orders /pnl /godfather /alerts
 ${this.isAdmin(chatId) ? '/kill /resume (admin)' : ''}`;
 
     await this.bot.sendMessage(chatId, text, {
@@ -95,6 +98,10 @@ ${this.isAdmin(chatId) ? '/kill /resume (admin)' : ''}`;
 
     this.bot.onText(/\/pnl/, (msg) => {
       this.handlePnl(msg.chat.id).catch(() => {});
+    });
+
+    this.bot.onText(/\/godfather/, (msg) => {
+      this.handleGodfather(msg.chat.id).catch(() => {});
     });
 
     this.bot.onText(/\/kill/, (msg) => {
@@ -130,6 +137,9 @@ ${this.isAdmin(chatId) ? '/kill /resume (admin)' : ''}`;
             break;
           case 'pnl':
             await this.handlePnl(chatId);
+            break;
+          case 'godfather':
+            await this.handleGodfather(chatId);
             break;
           case 'alerts':
             await this.handleAlerts(chatId);
@@ -218,6 +228,59 @@ Alerts: \`${this.alertEnabledChats.has(String(chatId)) ? 'ON' : 'OFF'}\``;
     await this.replyWithKeyboard(chatId, text);
   }
 
+  private async handleGodfather(chatId: number) {
+    try {
+      let openTrades: GodfatherTrade[] = [];
+      let dailyPnl = 0;
+
+      if (this.godfatherRepo) {
+        openTrades = await this.godfatherRepo.getOpenTrades();
+        dailyPnl = await this.godfatherRepo.getDailyPnl(new Date());
+      } else {
+        const port = process.env.API_PORT || '3001';
+        const res = await fetch(`http://127.0.0.1:${port}/api/v1/godfather/status`);
+        if (res.ok) {
+          const data: any = await res.json();
+          openTrades = data.openTrades || [];
+          dailyPnl = data.dailyPnlUsd || 0;
+        }
+      }
+
+      let text = `🎩 *GODFATHER SMC Directional Positions*\n`;
+      text += `Today's Realized PnL: *${dailyPnl >= 0 ? '+' : ''}$${dailyPnl.toFixed(2)} USDC*\n`;
+      text += `Active Positions: *${openTrades.length}*\n\n`;
+
+      if (openTrades.length === 0) {
+        text += `_No active Godfather positions currently open._\n`;
+        text += `Scanning M1/M15 order flow on BTC & SOL...`;
+      } else {
+        for (const t of openTrades) {
+          const dirIcon = t.direction === 'BUY' ? '🟢 LONG' : '🔴 SHORT';
+          const beStatus = t.isBreakevenLocked ? '🔒 LOCKED' : '⏳ ACTIVE';
+          text += `*${t.symbol}* (${dirIcon})\n`;
+          text += `• Entry: \`$${Number(t.entryPrice).toFixed(2)}\`\n`;
+          text += `• Stop Loss: \`$${Number(t.stopLoss).toFixed(2)}\` (BE: ${beStatus})\n`;
+          text += `• Total Size: \`${t.totalSize}\` (Remaining: \`${t.remainingSize}\`)\n`;
+
+          if (t.tranches && t.tranches.length > 0) {
+            text += `• *Tranches:*\n`;
+            for (const tr of t.tranches) {
+              const trIcon = tr.status === 'TAKEN' ? '✅' : (tr.status === 'CANCELLED' || tr.status === 'STOPPED_OUT') ? '❌' : '⏳';
+              const targetStr = tr.targetPrice ? `$${Number(tr.targetPrice).toFixed(2)}` : 'Chandelier ATR';
+              const trailStr = tr.trailingStop ? ` [Trail: $${Number(tr.trailingStop).toFixed(2)}]` : '';
+              text += `  ${trIcon} T${tr.trancheNumber}: ${targetStr}${trailStr} (${(tr.volumeFraction * 100).toFixed(0)}%)\n`;
+            }
+          }
+          text += `\n`;
+        }
+      }
+
+      await this.replyWithKeyboard(chatId, text);
+    } catch (err: any) {
+      await this.replyWithKeyboard(chatId, `⚠️ Failed to fetch Godfather status: ${err.message}`);
+    }
+  }
+
   private async handleKill(chatId: number) {
     if (!this.isAdmin(chatId)) {
       await this.bot.sendMessage(chatId, '🚫 Unauthorized.', {
@@ -249,16 +312,63 @@ Alerts: \`${this.alertEnabledChats.has(String(chatId)) ? 'ON' : 'OFF'}\``;
 
   private setupEventListeners() {
     const subscriber = this.redis.duplicate();
-    subscriber.subscribe('mev:opportunities');
+    subscriber.subscribe('mev:opportunities', 'godfather:signals', 'godfather:trades');
 
-    subscriber.on('message', (_channel: string, message: string) => {
+    subscriber.on('message', (channel: string, message: string) => {
       try {
         const event = JSON.parse(message);
-        this.handleExecutionEvent(event);
+        if (channel === 'godfather:signals') {
+          this.handleGodfatherSignal(event);
+        } else if (channel === 'godfather:trades') {
+          this.handleGodfatherTrade(event);
+        } else {
+          this.handleExecutionEvent(event);
+        }
       } catch {
         // Malformed message — ignore
       }
     });
+  }
+
+  private handleGodfatherSignal(event: { type?: string; payload?: any } | any) {
+    const signal = event.payload || event;
+    const gradeEmoji = signal.grade === 'A_PLUS' ? '🦄 *A+ UNICORN*' : '⭐ *GRADE A*';
+    const dirEmoji = signal.direction === 'BUY' ? '🟢 LONG' : '🔴 SHORT';
+    const text = `🎩 *GODFATHER SETUP DETECTED*
+Setup: ${gradeEmoji}
+Asset: \`${signal.symbol}\` | ${dirEmoji}
+Entry: \`$${Number(signal.entryPrice).toFixed(2)}\`
+Stop Loss: \`$${Number(signal.stopLoss).toFixed(2)}\`
+Allocated Risk: \`$${Number(signal.allocatedRiskUsd).toFixed(2)}\`
+Position Size: \`${Number(signal.positionSize).toFixed(4)}\`
+Session: \`${signal.session}\``;
+
+    this.broadcast(text);
+  }
+
+  private handleGodfatherTrade(event: { type: string; payload: any }) {
+    const { type, payload } = event;
+    if (type === 'TRANCHE_EXIT') {
+      const { trade, result } = payload;
+      const text = `🎯 *GODFATHER TRANCHE UPDATE*
+Asset: \`${trade.symbol}\` (${trade.direction})
+Action: *${result.action}*
+Note: ${result.message || ''}
+Realized PnL: *+$${Number(result.realizedPnlDeltaUsd).toFixed(2)} USDC*
+Remaining Size: \`${Number(trade.remainingSize).toFixed(4)}\``;
+
+      this.broadcast(text);
+    } else if (type === 'TRADE_CLOSED') {
+      const trade = payload;
+      const pnl = Number(trade.realizedPnlUsd);
+      const icon = pnl >= 0 ? '🏆' : '🛑';
+      const text = `${icon} *GODFATHER TRADE CLOSED*
+Asset: \`${trade.symbol}\` (${trade.direction})
+Exit Reason: \`${trade.exitReason || 'CLOSED'}\`
+Final Realized PnL: *${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} USDC*`;
+
+      this.broadcast(text);
+    }
   }
 
   private handleExecutionEvent(event: { type: string; payload: Record<string, unknown> }) {
