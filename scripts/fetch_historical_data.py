@@ -27,7 +27,23 @@ END_DT = datetime(2026, 9, 30, 23, 59, 59, tzinfo=timezone.utc)
 START_MS = int(START_DT.timestamp() * 1000)
 END_MS = int(END_DT.timestamp() * 1000)
 
-SYMBOLS = ["BTCUSDT", "SOLUSDT"]
+SYMBOLS = [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "DOGEUSDT",
+    "SUIUSDT",
+    "AVAXUSDT",
+    "NEARUSDT",
+    "LINKUSDT",
+    "APTUSDT",
+    "ARBUSDT",
+    "OPUSDT",
+    "WIFUSDT",
+    "1000PEPEUSDT",
+    "TIAUSDT",
+    "INJUSDT",
+]
 TIMEFRAMES = ["15m", "5m"]
 
 
@@ -140,12 +156,36 @@ def main():
 
     for symbol in SYMBOLS:
         for tf in TIMEFRAMES:
+            filename = f"{symbol}_{tf}_2026_01_to_2026_09.csv"
+            filepath = os.path.join(DATA_DIR, filename)
+
+            # Check if file already exists and is complete
+            if os.path.exists(filepath):
+                try:
+                    df = pd.read_csv(filepath)
+                    min_req = 25000 if tf == "15m" else 75000
+                    if len(df) >= min_req:
+                        file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
+                        summary_records.append({
+                            "Symbol": symbol,
+                            "Timeframe": tf,
+                            "Candles": len(df),
+                            "Start Date": df["datetime_utc"].iloc[0],
+                            "End Date": df["datetime_utc"].iloc[-1],
+                            "Min Price": f"${df['low'].min():,.4f}",
+                            "Max Price": f"${df['high'].max():,.4f}",
+                            "File Size": f"{file_size_mb:.2f} MB",
+                            "Path": filename,
+                        })
+                        print(f"⚡ Already cached: {filename} ({len(df):,} rows, {file_size_mb:.2f} MB)")
+                        continue
+                except Exception:
+                    pass
+
             df = fetch_klines(symbol, tf, START_MS, END_MS)
             if df.empty:
                 continue
 
-            filename = f"{symbol}_{tf}_2026_01_to_2026_09.csv"
-            filepath = os.path.join(DATA_DIR, filename)
             df.to_csv(filepath, index=False)
 
             file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
@@ -160,8 +200,8 @@ def main():
                 "Candles": len(df),
                 "Start Date": min_date,
                 "End Date": max_date,
-                "Min Price": f"${min_price:,.2f}",
-                "Max Price": f"${max_price:,.2f}",
+                "Min Price": f"${min_price:,.4f}",
+                "Max Price": f"${max_price:,.4f}",
                 "File Size": f"{file_size_mb:.2f} MB",
                 "Path": filename,
             })

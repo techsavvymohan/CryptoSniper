@@ -162,10 +162,32 @@ class InstitutionalGodfatherBacktest:
         self.df_15m = df_15m.copy()
         self.df_5m = df_5m.copy()
         self.is_btc = "BTC" in symbol.upper()
+        self.is_sol = "SOL" in symbol.upper()
 
-        self.min_sweep_breach = BTC_MIN_SWEEP_BREACH if self.is_btc else SOL_MIN_SWEEP_BREACH
-        self.sl_buffer = BTC_SL_BUFFER if self.is_btc else SOL_SL_BUFFER
-        self.min_fvg_gap = BTC_MIN_FVG_GAP if self.is_btc else SOL_MIN_FVG_GAP
+        avg_price = float(self.df_5m['close'].mean())
+        if self.is_btc:
+            self.min_sweep_breach = BTC_MIN_SWEEP_BREACH
+            self.sl_buffer = BTC_SL_BUFFER
+            self.min_fvg_gap = BTC_MIN_FVG_GAP
+            self.decimals = 4
+        elif self.is_sol:
+            self.min_sweep_breach = SOL_MIN_SWEEP_BREACH
+            self.sl_buffer = SOL_SL_BUFFER
+            self.min_fvg_gap = SOL_MIN_FVG_GAP
+            self.decimals = 2
+        else:
+            self.min_sweep_breach = max(avg_price * 0.0035, 0.0001)
+            self.sl_buffer = max(avg_price * 0.0015, 0.00005)
+            self.min_fvg_gap = max(avg_price * 0.0008, 0.00002)
+            if avg_price >= 1000:
+                self.decimals = 3
+            elif avg_price >= 10:
+                self.decimals = 2
+            elif avg_price >= 1:
+                self.decimals = 1
+            else:
+                self.decimals = 0
+
         self.max_retest_bars = MAX_RETEST_BARS_BTC if self.is_btc else MAX_RETEST_BARS_SOL
 
         self.equity = INITIAL_EQUITY
@@ -494,8 +516,7 @@ class InstitutionalGodfatherBacktest:
                                 if r_dist > 0:
                                     risk_usd = (self.equity * BASE_RISK_PCT) * mult
                                     raw_size = risk_usd / r_dist
-                                    decimals = 4 if self.is_btc else 2
-                                    pos_size = round(raw_size, decimals)
+                                    pos_size = round(raw_size, self.decimals)
 
                                     if pos_size > 0:
                                         pending_order = {
@@ -552,8 +573,7 @@ class InstitutionalGodfatherBacktest:
                                 if r_dist > 0:
                                     risk_usd = (self.equity * BASE_RISK_PCT) * mult
                                     raw_size = risk_usd / r_dist
-                                    decimals = 4 if self.is_btc else 2
-                                    pos_size = round(raw_size, decimals)
+                                    pos_size = round(raw_size, self.decimals)
 
                                     if pos_size > 0:
                                         pending_order = {
@@ -650,57 +670,81 @@ def compute_metrics(trades: list, equity_curve: list, symbol: str):
 
 def main():
     print("=" * 80)
-    print("🎩 THE GODFATHER QUANTITATIVE ENGINE: ICT-LEVEL HISTORICAL BACKTEST")
+    print("🎩 THE GODFATHER QUANTITATIVE ENGINE: MULTI-ASSET ICT HISTORICAL BACKTEST")
     print("Period: January 1, 2026 - September 30, 2026 (9 Months Real Binance Futures)")
-    print("Initial Equity: $10,000.00 | Risk: 0.85% Base | Multipliers: 2.40x A+ / 1.00x A")
+    print("Universe: 15 High-Liquidity Perpetual Pairs | Initial Equity: $10,000.00")
+    print("Risk: 0.85% Base Risk | Sizing: 1.25x A+ / 1.00x A | Fees: Maker 0.02%, Taker 0.05%")
     print("=" * 80)
 
-    # 1. Load Datasets
-    btc_15m_path = os.path.join(DATA_DIR, "BTCUSDT_15m_2026_01_to_2026_09.csv")
-    btc_5m_path = os.path.join(DATA_DIR, "BTCUSDT_5m_2026_01_to_2026_09.csv")
-    sol_15m_path = os.path.join(DATA_DIR, "SOLUSDT_15m_2026_01_to_2026_09.csv")
-    sol_5m_path = os.path.join(DATA_DIR, "SOLUSDT_5m_2026_01_to_2026_09.csv")
+    all_symbols = [
+        "BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "SUIUSDT",
+        "AVAXUSDT", "NEARUSDT", "LINKUSDT", "APTUSDT", "ARBUSDT",
+        "OPUSDT", "WIFUSDT", "1000PEPEUSDT", "TIAUSDT", "INJUSDT"
+    ]
 
-    for path in [btc_15m_path, btc_5m_path, sol_15m_path, sol_5m_path]:
-        if not os.path.exists(path):
-            print(f"❌ Required dataset not found: {path}")
-            print("Please run: python scripts/fetch_historical_data.py first.")
-            return
-
-    # 2. Backtest BTCUSDT
-    df_btc_15m = pd.read_csv(btc_15m_path)
-    df_btc_5m = pd.read_csv(btc_5m_path)
-    bt_btc = InstitutionalGodfatherBacktest("BTCUSDT", df_btc_15m, df_btc_5m)
-    bt_btc.run()
-    btc_metrics = compute_metrics(bt_btc.trades, bt_btc.equity_curve, "BTCUSDT")
-
-    # 3. Backtest SOLUSDT
-    df_sol_15m = pd.read_csv(sol_15m_path)
-    df_sol_5m = pd.read_csv(sol_5m_path)
-    bt_sol = InstitutionalGodfatherBacktest("SOLUSDT", df_sol_15m, df_sol_5m)
-    bt_sol.run()
-    sol_metrics = compute_metrics(bt_sol.trades, bt_sol.equity_curve, "SOLUSDT")
-
-    # 4. Print Summary Table
-    print("\n" + "=" * 80)
-    print("📊 INSTITUTIONAL ICT BACKTEST PERFORMANCE SUMMARY (JAN 2026 - SEP 2026)")
-    print("=" * 80)
-    results = [btc_metrics, sol_metrics]
-    summary_df = pd.DataFrame(results)
-    print(summary_df.T.to_string(header=False))
-    print("=" * 80)
-
-    # Save detailed trade journals to CSV
+    results = []
+    all_trades = []
     os.makedirs(os.path.join(DATA_DIR, "backtest_results"), exist_ok=True)
-    if bt_btc.trades:
-        pd.DataFrame(bt_btc.trades).to_csv(os.path.join(DATA_DIR, "backtest_results", "btc_trade_journal.csv"), index=False)
-    if bt_sol.trades:
-        pd.DataFrame(bt_sol.trades).to_csv(os.path.join(DATA_DIR, "backtest_results", "sol_trade_journal.csv"), index=False)
 
-    print("\n📁 Detailed Trade Journals saved to:")
-    print("  • data/historical/backtest_results/btc_trade_journal.csv")
-    print("  • data/historical/backtest_results/sol_trade_journal.csv")
-    print("\n✅ Institutional ICT Backtest Complete!\n")
+    for symbol in all_symbols:
+        path_15m = os.path.join(DATA_DIR, f"{symbol}_15m_2026_01_to_2026_09.csv")
+        path_5m = os.path.join(DATA_DIR, f"{symbol}_5m_2026_01_to_2026_09.csv")
+
+        if not os.path.exists(path_15m) or not os.path.exists(path_5m):
+            print(f"⚠️ Skipping {symbol}: Dataset not found.")
+            continue
+
+        df_15m = pd.read_csv(path_15m)
+        df_5m = pd.read_csv(path_5m)
+
+        bt = InstitutionalGodfatherBacktest(symbol, df_15m, df_5m)
+        bt.run()
+
+        metrics = compute_metrics(bt.trades, bt.equity_curve, symbol)
+        if metrics:
+            results.append(metrics)
+            all_trades.extend(bt.trades)
+
+            # Save individual journal
+            journal_path = os.path.join(DATA_DIR, "backtest_results", f"{symbol.lower()}_trades.csv")
+            pd.DataFrame(bt.trades).to_csv(journal_path, index=False)
+
+    print("\n" + "=" * 80)
+    print("📊 15-PAIR MULTI-ASSET ICT BACKTEST RESULTS (JAN 2026 - SEP 2026)")
+    print("=" * 80)
+    summary_df = pd.DataFrame(results)
+    print(summary_df.to_string(index=False))
+
+    # Consolidated Multi-Asset Portfolio Performance
+    if all_trades:
+        df_all = pd.DataFrame(all_trades).sort_values("entry_time").reset_index(drop=True)
+        total_p_trades = len(df_all)
+        p_wins = df_all[df_all['total_realized_pnl'] > 0]
+        p_losses = df_all[df_all['total_realized_pnl'] <= 0]
+        p_win_rate = (len(p_wins) / total_p_trades) * 100
+        p_net_pnl = df_all['total_realized_pnl'].sum()
+        p_gross_profit = p_wins['total_realized_pnl'].sum() if len(p_wins) > 0 else 0
+        p_gross_loss = abs(p_losses['total_realized_pnl'].sum()) if len(p_losses) > 0 else 1
+        p_pf = p_gross_profit / p_gross_loss if p_gross_loss > 0 else 0
+
+        # 273 days between Jan 1 and Sep 30
+        trades_per_day = total_p_trades / 273.0
+
+        # Save consolidated trade master journal
+        df_all.to_csv(os.path.join(DATA_DIR, "backtest_results", "portfolio_master_journal.csv"), index=False)
+
+        print("\n" + "=" * 80)
+        print("🏆 CONSOLIDATED MULTI-ASSET PORTFOLIO METRICS (15 PAIRS)")
+        print("=" * 80)
+        print(f"  • Total Executed Trades:       {total_p_trades:,} trades across 9 months")
+        print(f"  • Daily Trading Frequency:     {trades_per_day:.1f} trades / day")
+        print(f"  • Portfolio Win Rate:          {p_win_rate:.1f}% ({len(p_wins)} Wins / {len(p_losses)} Losses)")
+        print(f"  • Portfolio Profit Factor:     {p_pf:.2f}")
+        print(f"  • Total Net Realized Profit:   ${p_net_pnl:+,.2f} ({(p_net_pnl / INITIAL_EQUITY) * 100:+.2f}% ROI)")
+        print(f"  • Final Account Equity:        ${INITIAL_EQUITY + p_net_pnl:,.2f}")
+        print(f"  • Average Profit / Trade:      ${df_all['total_realized_pnl'].mean():+,.2f}")
+        print("=" * 80)
+        print(f"📁 Master Journal: data/historical/backtest_results/portfolio_master_journal.csv\n")
 
 
 if __name__ == "__main__":

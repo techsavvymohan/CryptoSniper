@@ -43,3 +43,6 @@ tmp
 pgdata
 redisdata
 .redis-local
+
+# Bulk raw historical futures downloads
+data/historical/*_2026_01_to_2026_09.csv
