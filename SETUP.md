@@ -4,7 +4,7 @@ This guide walks you through setting up the institutional dual-engine quantitati
 
 **What we're building:** A dual-engine crypto trading fund system:
 1. **Engine 1 (Solana MEV Arbitrage)**: Watches Raydium CLMM, Orca Whirlpool, and OpenBook on Solana, detects price mispricings via Yellowstone Geyser gRPC, and executes atomic, zero-capital-risk back-run arbitrage bundles via the Jito Block Engine.
-2. **Engine 2 (The GODFATHER Directional Scalper)**: Institutional Price-Action & Microstructure scalping engine on **Bitcoin ($BTCUSD$)** and **Solana ($SOLUSD$)**, utilizing a 5-stage confluence trigger (Fractal Sweeps, Delta Absorption, Displacement, MSS, and FVG Retest) with 3-tranche execution across **Hyperliquid L1** (primary native DEX) and **Bybit V5** (secondary CEX fallback).
+2. **Engine 2 (The GODFATHER Triad Scalper)**: Institutional Price-Action & Microstructure scalping system running 3 dedicated concurrent engines in parallel via `GodfatherTriadManager`: **Bitcoin ($BTCUSD$)** (40% capital anchor), **Solana ($SOLUSD$)** (30% high-beta runner), and **Alts Winners Basket ($ETHUSD$, $AVAXUSD$, $NEARUSD$, $LINKUSD$)** (30% momentum runner), utilizing a 100% self-calibrating dynamic 5-stage confluence trigger with 3-tranche execution across **Hyperliquid L1** (primary native DEX) and **Bybit V5** (secondary CEX fallback).
 
 **Important:** This project does **not** use Docker for native development. You install PostgreSQL and Redis directly on your machine for maximum sub-millisecond execution performance.
 
@@ -307,9 +307,16 @@ HYPERLIQUID_VAULT_ADDRESS=
 BYBIT_API_KEY=your_bybit_api_key
 BYBIT_API_SECRET=your_bybit_api_secret
 
-# Asset Activations & Parameters
+# Triad Engine Activations & Capital Allocations
 GODFATHER_BTC_ENABLED=true
 GODFATHER_SOL_ENABLED=true
+GODFATHER_ALTS_ENABLED=true
+GODFATHER_ALTS_SYMBOLS=ETHUSD,AVAXUSD,NEARUSD,LINKUSD
+GODFATHER_BTC_ALLOCATION_PCT=40.0
+GODFATHER_SOL_ALLOCATION_PCT=30.0
+GODFATHER_ALTS_ALLOCATION_PCT=30.0
+
+# Dynamic Indicators & Confluence Baseline
 GODFATHER_BTC_SWEEP_MIN_USD=50.0
 GODFATHER_SOL_SWEEP_MIN_USD=0.50
 
@@ -318,18 +325,21 @@ GODFATHER_MAX_ACCOUNT_RISK_PCT=0.85
 GODFATHER_DAILY_LOSS_LIMIT_USD=450
 GODFATHER_MAX_CONSECUTIVE_LOSSES=2
 
-# 3-Tranche Execution Mechanics
-GODFATHER_TRANCHE1_PCT=25.0
+# Dynamic 3-Tranche Execution Mechanics
+GODFATHER_TRANCHE1_PCT=35.0
 GODFATHER_TRANCHE2_PCT=35.0
-GODFATHER_TRANCHE3_PCT=40.0
-GODFATHER_CHANDELIER_ATR_MULT=3.0
+GODFATHER_TRANCHE3_PCT=30.0
+GODFATHER_CHANDELIER_ATR_MULT=4.2
 ```
 
 | Setting | Options / Value | Meaning |
 |---|---|---|
-| `DIRECTIONAL_VENUE` | `hyperliquid` \| `bybit` \| `paper` | Which execution adapter routes BTC/SOL trades |
+| `DIRECTIONAL_VENUE` | `hyperliquid` \| `bybit` \| `paper` | Which execution adapter routes trades |
 | `DIRECTIONAL_TESTNET` | `true` \| `false` | When `true`, uses Hyperliquid testnet or Bybit testnet |
 | `HYPERLIQUID_WALLET_PRIVATE_KEY` | Hex Ethereum private key | EIP-712 Agent wallet used to sign orders without gas |
+| `GODFATHER_BTC_ALLOCATION_PCT` | `40.0` | 40% capital allocated to BTC macro anchor engine |
+| `GODFATHER_SOL_ALLOCATION_PCT` | `30.0` | 30% capital allocated to SOL high-beta engine |
+| `GODFATHER_ALTS_ALLOCATION_PCT` | `30.0` | 30% capital allocated to Alts basket engine |
 | `GODFATHER_MAX_ACCOUNT_RISK_PCT` | `0.85` | 0.85% base equity risk per trade (Prop Firm mode) |
 | `GODFATHER_DAILY_LOSS_LIMIT_USD` | `450` | $450 daily loss ceiling on a $10,000 account (4.5% rule) |
 
@@ -412,13 +422,13 @@ Takes 1–2 minutes. **You should see:** all 13 packages compiling cleanly with 
 - `@mev-research/main`
 - `@mev-research/dashboard`
 
-**Run unit tests to verify the engine:**
+**Run full workspace test suite (verified locally without cloud CI dependency):**
 
 ```powershell
-pnpm --filter @mev-research/godfather-engine test
+pnpm test
 ```
 
-**You should see:** `10/10 tests pass` covering Causal Resampling, ATR/CHOP, Fractal Sweeps, MSS/FVG triggers, and Kelly sizing!
+**You should see:** `24/24 tests pass (100% green)` across all packages (14/14 tests in `@mev-research/godfather-engine` covering Causal Resampling, M1/M15 Wilder's ATR/CHOP indicators, Dynamic Fractal Sweeps, MSS/FVG triggers, Kelly sizing, and the 3-Tranche Lifecycle Manager, plus execution and spread-engine test suites)!
 
 ---
 
@@ -460,14 +470,17 @@ You should see both engines initializing cleanly in your terminal:
 [SimRunner] MEV Simulation engine running
 
 [Godfather] ========================================
-[Godfather] THE GODFATHER Directional Engine v2.0
+[Godfather] THE GODFATHER Triad Concurrent Engine v2.0
 [Godfather] Primary Venue: Hyperliquid L1 (Testnet: true)
 [Godfather] Secondary Venue: Bybit V5 (UTA Fallback)
-[Godfather] Active Pairs: BTCUSD, SOLUSD
+[Godfather] Concurrent Triad:
+[Godfather]   ├── btcEngine (40% Capital): BTCUSD
+[Godfather]   ├── solEngine (30% Capital): SOLUSD
+[Godfather]   └── altsEngine (30% Capital): ETHUSD, AVAXUSD, NEARUSD, LINKUSD
 [Godfather] Multi-TF Causal Resampler: M1 -> M5, M15, H1, H4
-[Godfather] Confluence Rules: 5-Stage Sweep & FVG Retest
+[Godfather] 100% Dynamic Math: M1/M15 Wilder's ATR + Choppiness Index
 [Godfather] Sizing: Tiered Conviction (Unicorn 2.4x / Normal 1.0x)
-[Godfather] Execution: 3-Tranche (25% @ 1R, 35% @ 2R, 40% Moonbag)
+[Godfather] Execution: 3-Tranche (35% @ 1.5R, 35% @ Dyn R2, 30% Moonbag)
 [Godfather] ========================================
 
 [API] Server listening on http://localhost:3001
@@ -535,9 +548,9 @@ curl http://localhost:3001/api/v1/execution/status
 curl http://localhost:3001/api/v1/godfather/signals
 # ✓ Should return recent BTCUSD/SOLUSD confluence signals array []
 
-# 6. Run automated test suite
-pnpm --filter @mev-research/godfather-engine test
-# ✓ Should show: 10/10 tests passed (Causal Resampler, ATR/CHOP, Fractal Sweeps, Kelly Sizer)
+# 6. Run automated test suite across entire workspace
+pnpm test
+# ✓ Should show: 24/24 tests passed across all packages (100% green)
 ```
 
 ### On Telegram
@@ -740,7 +753,7 @@ pnpm install
 Copy-Item .env.example .env     # fill in your API keys & wallets
 pnpm migrate                    # create all 11 PostgreSQL tables (MEV + Godfather)
 pnpm build                      # compile all 13 monorepo packages
-pnpm --filter @mev-research/godfather-engine test # verify 10/10 tests pass
+pnpm test                       # verify 24/24 tests pass across all packages (100% green)
 
 # === EVERY TIME YOU RUN ===
 pnpm start                      # Terminal 1: start dual-engine fund bot

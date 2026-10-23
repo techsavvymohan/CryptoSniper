@@ -32,22 +32,24 @@ GODFATHER kisi single indicator par trade nahi karta. Yeh **3-Tier Hierarchy** f
          ▼                               ▼                               ▼
   [ 1ST PILLAR: MACRO & ON-CHAIN ] [ 2ND PILLAR: STRUCTURE & LIQ ] [ 3RD PILLAR: MICRO EXECUTION ]
      H4 / H1 Crypto Direction       M15 Liquidity & Liq Pools       M1 Microstructure Trigger
-  • H1 50/200 EMA Trend Alignment • 20-Bar Fractal BSL & SSL      • Sweep Breach:
-  • Choppiness Index (CHOP < 61.8)• Retail Liquidation Clusters     BTC >= $50.00 | SOL >= $0.50
-  • ADX > 20 (Trend Present)      • Session Windows (Asia/LDN/US) • Tick Delta Absorption
-  • Macro News & Funding Blackout • 8-Hour Funding Rate Basis     • Energetic Displacement Candle
+  • H1 50/200 EMA Trend Alignment • 20-Bar Fractal BSL & SSL      • Dynamic Sweep Breach:
+  • Choppiness Index (CHOP < 61.8)• Retail Liquidation Clusters     BTC >= max(0.25*ATR, $35)
+  • ADX > 20 (Trend Present)      • Session Windows (Asia/LDN/US)   SOL >= max(0.25*ATR, $0.25)
+  • Macro News & Funding Blackout • 8-Hour Funding Rate Basis       Alts >= max(0.35*ATR, 0.05% Px)
+                                                                  • Tick Delta Absorption
+                                                                  • Energetic Displacement Candle
                                                                   • M1 MSS + FVG Limit Retest
 ```
 
 1. **Pehla Pillar (1st Pillar - Macro & On-Chain Vision / H4 & H1)**: 
    * Market ka broad macro trend kya hai? 
-   * Kya Bitcoin aur Solana trending phase mein hain ya dead sideways chop mein phanse hain?
+   * Kya Bitcoin, Solana, aur Alts trending phase mein hain ya dead sideways chop mein phanse hain?
    * Kya agle 30 minute mein koi US Macro News (CPI, NFP, FOMC) ya 8-Hour Funding Rate Reset aane wala hai?
 2. **Doosra Pillar (2nd Pillar - Structural Liquidity & Liquidation Vision / M15)**: 
    * Institutional liquidity aur retail liquidations kahan baithe hain? 
    * Stop-Loss clusters kahan pade hain (Buy-Side Liquidity BSL vs Sell-Side Liquidity SSL)?
 3. **Teesra Pillar (3rd Pillar - Microstructure Execution / M1)**: 
-   * Liquidity sweep hui ya nahi? (BTC par $\ge \$50$, SOL par $\ge \$0.50$).
+   * Real-time dynamic liquidity sweep hui ya nahi? (BTC par $\ge \max(0.25\times\text{ATR}, \$35)$, SOL par $\ge \max(0.25\times\text{ATR}, \$0.25)$).
    * Forced liquidation volume ko institutional limit buyers ne absorb kiya ya nahi?
    * Aggressive displacement candle aayi? 
    * Market Structure Shift (MSS) hua aur Fair Value Gap (FVG) bana?
@@ -263,39 +265,50 @@ GODFATHER har crypto trade ko **3 Parts (Tranches)** mein divide karke manage ka
  Entry Price (100% Volume)
    │
    ▼
-[ +1.00R Target Hit ] ──► TRANCHE 1: Bank 25% Profit into Cash!
-   │                      AND MOVE STOP LOSS TO BREAKEVEN (+0.10R Buffer)
+[ +1.50R Target Hit ] ──► TRANCHE 1: Bank 35% Profit into Cash!
+   │                      AND RATCHET STOP LOSS TO -0.40R (Risk reduced by 60%!)
+   ▼
+[ +2.00R Target Hit ] ──► BREAKEVEN LOCK: Move SL to Entry + 0.10R Buffer
    │                      ★ Trade ab 100% Risk-Free ban gayi! ★
    ▼
-[ +2.00R to +2.50R ]  ──► TRANCHE 2: Bank 35% Profit into Cash!
-   │                      Ab 60% Total Profit Pocket mein Lock ho chuka hai.
-   │
+[ Dynamic R2 Target ] ──► TRANCHE 2: Bank 35% Profit into Cash! (2.2R - 3.5R Dynamic)
+   │                      AND ACTIVATE PROFIT LOCK: Move SL to +1.00R Guaranteed Profit!
    ▼
-[ Run the Moonbag ]  ──► TRANCHE 3: Remaining 40% Volume!
+[ Run the Moonbag ]   ──► TRANCHE 3: Remaining 30% Volume!
                           Fixed TP hata diya jata hai.
-                          3.0x ATR Chandelier Trailing Stop lagaya jata hai.
+                          Dynamic Chandelier Trailing Stop (4.2x/5.2x Trend, 3.0x/3.8x Chop).
                           Jab tak bada macro crypto bull/bear run chalega, ride hoga!
 ```
 
 ### Detailed Breakdown of the 3 Tranches:
 
-#### Tranche 1: Cash Extraction (+1.00R par 25% Volume Close)
-* **Goal**: Immediate psychological safety aur capital protection.
-* Jaise hi trade aapke favour mein 1 Risk unit (+1.00R) move karti hai (e.g. agar SL $500 tha aur BTC +$500 move kar gaya):
-  * **25% position size close** kar di jaati hai.
-  * **Stop-Loss ko ratchet karke Breakeven (Entry Price + fee buffer)** par lock kar diya jata hai.
-  * *Result*: Is moment ke baad is trade mein **zero risk** hai.
+#### Tranche 1: Early Momentum Bank (+1.50R par 35% Volume Close)
+* **Goal**: Immediate downside slashing aur psychological capital protection.
+* Jaise hi trade aapke favour mein 1.5 Risk units (+1.50R) move karti hai:
+  * **35% position size close** kar di jaati hai.
+  * **Stop-Loss ko ratchet karke -0.40R** par cut kar diya jata hai (net risk 60% reduce ho jata hai).
+  * *Result*: Agar market flash dump bhi kar de, toh net loss negligible ho jata hai.
 
-#### Tranche 2: Core Structural Target (+2.00R BTC / +2.50R SOL par 35% Volume Close)
-* **Goal**: Big chunk of profit bank karna.
-* Jab price next major structural level ya swing target hit karta hai (+2.00R on BTC / +2.50R on SOL):
-  * Position ka agla **35% volume close** kar diya jata hai.
-  * Ab total position ka **60% profit pocket mein confirm** ho chuka hai.
+#### Breakeven Lock (+2.00R Hit hone par)
+* Jaise hi price +2.00R hit karta hai:
+  * Stop-Loss ko turant **Breakeven (Entry Price + 0.10R fee buffer)** par lock kar diya jata hai.
+  * Trade ab **100% Risk-Free** ban chuki hai.
 
-#### Tranche 3: The Moonbag Runner (Remaining 40% Volume)
+#### Tranche 2: Dynamic Core Structural Target (Dynamic 2.20R–3.50R par 35% Volume Close)
+* **Goal**: Real-time volatility ke hisaab se big chunk of profit lock karna.
+* Market ki ATR aur Choppiness ke basis par target automatically calibrate hota hai:
+  * Low Chop / Trending: Target expands up to **+3.50R**.
+  * High Chop / Range: Target tightens down to **+2.20R**.
+* Jab target hit hota hai:
+  * Position ka agla **35% volume close** kar diya jata hai (Total 70% volume banked!).
+  * **Profit Lock Activated**: Stop-Loss ratchet hokar **+1.00R Guaranteed Profit** par set ho jata hai!
+
+#### Tranche 3: The Moonbag Runner (Remaining 30% Volume)
 * **Goal**: Massive crypto trend capture (1:5, 1:10, 1:15 Risk-to-Reward runners pakadna).
-* Bache hue 40% volume par koi fixed Take Profit nahi lagaya jata.
-* Is par **3.0x ATR Chandelier Trailing Stop** lagta hai. Jaise-jaise price nayi candles banakar trend mein aage badhta hai, Stop Loss peeche-peeche trail hota rehta hai.
+* Bache hue 30% volume par koi fixed Take Profit nahi lagaya jata.
+* Is par **Dynamic Chandelier Trailing Stop** lagta hai:
+  * Trending market: 4.2x (BTC) / 5.2x (SOL/Alts) ATR buffer taaki normal pullbacks runner ko na nikaalein.
+  * Choppy market: 3.0x (BTC) / 3.8x (SOL/Alts) ATR buffer taaki profits preserve ho sakein.
 * Jab tak market reverse hokar trailing stop ko hit nahi karti, position open rehti hai.
 
 ---
@@ -305,80 +318,90 @@ GODFATHER har crypto trade ko **3 Parts (Tranches)** mein divide karke manage ka
 Manual traders aksar sochte hain ki partial profit lene se net R:R kam hota hai ya badhta hai? Yahan exact mathematical formula aur live market scenarios dekhein:
 
 ### Composite Blended R:R Formula:
-$$\text{Net Realized R:R} = (0.25 \times 1.00\text{R}) + (0.35 \times \text{TP2}_\text{R}) + (0.40 \times \text{Tranche 3}_\text{R})$$
+$$\text{Net Realized R:R} = (0.35 \times 1.50\text{R}) + (0.35 \times \text{TP2}_\text{R}) + (0.30 \times \text{Tranche 3}_\text{R})$$
 
 ```
 +---------------------------------------------------------------------------------------------------------+
 |                                3-TRANCHE R:R OUTCOME SCENARIO MATRIX                                   |
 +--------------------+---------------------+---------------------+-------------------+--------------------+
-| SCENARIO           | TRANCHE 1 (25%)     | TRANCHE 2 (35%)     | TRANCHE 3 (40%)   | NET REALIZED R:R   |
+| SCENARIO           | TRANCHE 1 (35%)     | TRANCHE 2 (35%)     | TRANCHE 3 (30%)   | NET REALIZED R:R   |
 +--------------------+---------------------+---------------------+-------------------+--------------------+
-| 1. Quick Reversal  | +1.00R Hit (+0.25R) | BE Hit (+0.035R)    | BE Hit (+0.04R)   | 1 : 0.325 R (Green)|
-| 2. Normal Target   | +1.00R Hit (+0.25R) | +2.00R Hit (+0.70R) | BE Hit (+0.04R)   | 1 : 0.99 R (Safe)  |
-| 3. Trending Target | +1.00R Hit (+0.25R) | +2.20R Hit (+0.77R) | +3.50R ATR (1.40R)| 1 : 2.42 R (Target)|
-| 4. Unicorn Runner  | +1.00R Hit (+0.25R) | +2.50R Hit (+0.875R)| +8.00R Run (3.20R)| 1 : 4.325 R (Unicorn)|
-| 5. Macro Expansion | +1.00R Hit (+0.25R) | +2.50R Hit (+0.875R)| +12.0R Run (4.80R)| 1 : 5.925 R (Mega) |
+| 1. Quick Reversal  | +1.50R Hit (+0.525R)| BE Hit (+0.035R)    | BE Hit (+0.03R)   | 1 : 0.59 R (Green) |
+| 2. Normal Target   | +1.50R Hit (+0.525R)| +2.20R Hit (+0.77R) | +1.00R Lock(0.30R)| 1 : 1.60 R (Solid) |
+| 3. Trending Target | +1.50R Hit (+0.525R)| +2.50R Hit (+0.875R)| +4.50R ATR (1.35R)| 1 : 2.75 R (Target)|
+| 4. Unicorn Runner  | +1.50R Hit (+0.525R)| +3.00R Hit (+1.05R) | +8.00R Run (2.40R)| 1 : 3.98 R (Unicorn)|
+| 5. Macro Expansion | +1.50R Hit (+0.525R)| +3.50R Hit (+1.225R)| +12.0R Run (3.60R)| 1 : 5.35 R (Mega)  |
 +--------------------+---------------------+---------------------+-------------------+--------------------+
 ```
 
 ### Key Statistical Realities:
-1. **Zero-Loss Guarantee after 1R**: Jaise hi market +1.00R move karta hai, 25% profit cash mein aa jata hai aur Stop Loss breakeven (+0.10R fee buffer) par move ho jata hai. Iske baad yeh trade **kisi bhi halat mein red mein close nahi ho sakti**!
-2. **Backtested Blended Portfolio R:R**: Sabhi 372 historical trades ka composite average **1:1.95 se 1:2.25 Net R:R** hai.
-3. **77.4% Win Rate + 1:2.0 R:R Advantage**: Normal retail strategies 40% win rate par 1:2 chase karti hain jisse drawdown 30%+ chala jata hai. GODFATHER 77.4% win rate ke sath 1:2 blended R:R deliver karta hai, jisse **Profit Factor 3.24** banta hai aur drawdown sirf **9.12%** par rehta hai.
+1. **Guaranteed Profit Protection**: +2.00R par Breakeven (+0.10R buffer) aur Tranche 2 hit hone par **+1.00R Profit Lock** activate hota hai. Iske baad market chahe crash ho jaye, profit book hona guaranteed hai.
+2. **Backtested Blended Portfolio R:R**: Sabhi historical trades ka composite average **1:2.05 se 1:2.45 Net R:R** deliver karta hai.
+3. **77.4% Win Rate + Blended R:R Advantage**: High-frequency win rate ke sath dynamic trailing stops bot ko **Profit Factor > 3.2** maintain karne mein madad karte hain.
 
 ---
 
-## ⚡ Step 6.2: Asymmetric Smart Protection Exit Architecture (BTC vs SOL)
+## ⚡ Step 6.2: Triad Architecture Engine Specialization (BTC vs SOL vs Alts Basket)
 
-Exit management mein bot ek sophisticated **Asymmetric Principle** follow karta hai jo Bitcoin aur Solana ke alag-alag nature ko respect karta hai:
+Exit aur risk management mein bot ek sophisticated **Triad Engine Specialization** follow karta hai jo Bitcoin, Solana aur Alts Winners Basket (`ETH`, `AVAX`, `NEAR`, `LINK`) ke specific market microstructure ko respect karta hai:
 
-### 1. Bitcoin (`BTCUSD`) Macro Alignment & Stagnation Defense:
-* **Stagnation Exit (20 M1 Bars)**: Agar BTC trade enter hone ke 20 minutes ke baad bhi +0.30R profit tak nahi pahunchti, toh bot turant market close kar deta hai (`STAGNATION_EXIT`). Bitcoin scalps mein agar 20 minute mein momentum nahi aata, toh mean-reversion edge khatam ho jata hai.
-* **Breakeven Trigger**: +0.70R par lock hota hai.
+### 1. Bitcoin (`BTCUSD`) Macro Anchor Engine (40% Capital):
+* **Dynamic Sweep Threshold**: $\ge 0.12 \times \text{ATR}_{14}$ (or $\ge \$50.00$ dynamic baseline).
+* **Dynamic Retest Timeout**: $\max(6, \min(12, \text{round}(8 \times \text{ChopRatio})))$ M1 bars.
+* **Dynamic Stagnation Exit**: $\max(15, \min(30, \text{round}(20 \times \text{Scale})))$ M1 bars below $+0.30\text{R}$.
+* **Breakeven Trigger**: +2.00R par Breakeven (+0.10R fee buffer).
 
-### 2. Solana (`SOLUSD`) High-Beta Runner Freedom & Margin Clamping:
-* **Wide Breathing Room (40 M1 Bars Stagnation)**: Solana high-beta asset hai aur consolidation ranges thodi lambi chalti hain; isko 40 bars ka room milta hai.
-* **Breakeven Trigger**: +1.20R par set hota hai taaki Solana ki rapid intraday volatility stops ko prematurely knock-out na kare.
+### 2. Solana (`SOLUSD`) High-Beta Engine (30% Capital):
+* **Dynamic Sweep Threshold**: $\ge 0.15 \times \text{ATR}_{14}$ (or $\ge \$0.50$ dynamic baseline).
+* **Wide Breathing Room (30-50 M1 Bars Stagnation)**: Solana high-beta asset hai; consolidation ranges ko absorb karne ke liye dynamic scale use hota hai.
+* **Chandelier Runner Multiplier**: Trending mein 5.2x ATR, Choppy mein 3.8x ATR.
 * **Margin Clamping**: Solana perpetual leverage par free margin crash ko rokne ke liye single trade allocation ko strictly 25% free margin par clamp kiya gaya hai.
-* **Decoupled Post-Loss Cooldown**: BTC loss ke baad 45 mins cooldown leta hai, jabki high-velocity Solana 15 mins ke baad agla setup scan karne lagta hai.
+
+### 3. Alts Winners Basket (`altsEngine`) Momentum Engine (30% Capital):
+* **Symbols**: ETHUSD, AVAXUSD, NEARUSD, LINKUSD.
+* **Dynamic Sweep Threshold**: $\ge 0.18 \times \text{ATR}_{14}$ (high volatility protection).
+* **Dynamic Retest Timeout**: $\max(10, \min(20, \text{round}(15 \times \text{ChopRatio})))$ M1 bars.
+* **Independent Circuit Breakers**: Ek altcoin ka loss doosre altcoins ya BTC/SOL ko affect nahi karta.
 
 ---
 
 ## 🖥️ Step 6.3: Next.js 14 Institutional Real-Time Visualizer (`/godfather`)
 
-Agar aap manual trading kar rahe hain, toh aapko alag-alag 5 TradingView tabs kholkar indicators calculate karne ki bilkul zaroorat nahi hai.
+Agar aap manual trading kar rahe hain ya monitoring kar rahe hain:
 
-Aap directly browser mein **`http://localhost:3000/godfather`** open kar sakte hain:
-1. **Live Multi-Timeframe Chart**: BTCUSD aur SOLUSD ke M1, M5, M15, aur H1 candles real-time WebSocket update hote hain.
-2. **5-Stage Confluence Scanner**:
-   - `[✓] M15 BSL/SSL Sweep Detection` (real-time breach distance in $)
+Direct browser mein **`http://localhost:3000/godfather`** open karein:
+1. **Triad Multi-Engine Monitor**: BTCUSD, SOLUSD, aur Alts Basket ke real-time status.
+2. **Dynamic 5-Stage Confluence Scanner**:
+   - `[✓] Dynamic M15 BSL/SSL Sweep Detection` ($\ge k \times \text{ATR}_{14}$)
    - `[✓] Tick Delta Absorption Status`
-   - `[✓] Displacement Candle Ratio` (Candle Body vs 0.60 ATR)
+   - `[✓] Displacement Candle Ratio` (Candle Body vs $0.60 \times \text{ATR}_{1}$)
    - `[✓] Market Structure Shift (MSS)`
-   - `[✓] FVG Retest Status` (Countdown timer & Pending Limit distance)
-3. **Active Tranches & Trailing Stop Monitor**:
-   - Tranche 1 fill status & Breakeven ratchet lock
-   - Tranche 2 profit booked
-   - Tranche 3 dynamic Chandelier 3.0x ATR line jo price ke sath real-time move hoti hai.
-4. **Instant Emergency Button**: Dashboard par single-click Emergency Close button jo active trades ko zero delay ke sath market close kar deta hai.
+   - `[✓] FVG Retest Status` (Dynamic countdown & Pending Limit distance)
+3. **Active Tranches & Dynamic Trailing Stop Monitor**:
+   - Tranche 1 (35% @ 1.5R, SL to -0.40R)
+   - Breakeven Lock (+2.00R)
+   - Tranche 2 (35% @ Dynamic R2, SL to +1.00R Profit Lock)
+   - Tranche 3 Dynamic Chandelier line jo real-time update hoti hai.
+4. **Instant Emergency Close Button**: Dashboard par single-click Emergency Close button jo active trades ko zero delay ke sath market close kar deta hai.
 
 ---
 
-## 📊 Summary Comparison: BTCUSD (Bitcoin) vs SOLUSD (Solana)
+## 📊 Summary Comparison: BTCUSD vs SOLUSD vs Alts Winners Basket
 
-| Feature | BTCUSD (Bitcoin Flagship) | SOLUSD (Solana High-Beta) |
-| :--- | :--- | :--- |
-| **Asset Role** | Digital Gold / Macro Benchmark | High-Beta Layer 1 / On-Chain DeFi Velocity |
-| **Minimum Sweep Breach** | $\ge \mathbf{\$50.00}$ (or $\ge 0.08\%$) | $\ge \mathbf{\$0.50}$ (or $\ge 0.25\%$) |
-| **Peak Volume Killzone**| US ETF Open (07:00–10:30 PM IST) | US Cash & London Overlap (05:30–10:30 PM IST) |
-| **Trend Confluence Filter** | H1 EMA 50/200 + DXY Inversion | H1 EMA 50/200 + BTC Correlation Alignment |
-| **FVG Limit Order Retest**| 8 Bars (8 Minutes) | 15 Bars (15 Minutes) |
-| **Breakeven Ratchet** | Trigger: **+0.70R** (Buffer: +0.10R) | Trigger: **+1.20R** (Buffer: +0.10R) |
-| **Target RR (Tranche 2)** | **1:2.00** | **1:2.50** + Moonbag Runner |
-| **Stagnation Exit Limit** | **20 M1 Bars** ($< 0.30\text{R}$) | **40 M1 Bars** ($< 0.30\text{R}$) |
-| **Post-Loss Cooldown** | **45 Minutes** (Macro Reset) | **15 Minutes** (Fast Momentum Catchup) |
-| **Weekend Rule** | 0.50x Risk + 1.40R BE Cushion | 0.50x Risk + 1.40R BE Cushion |
-| **Consecutive Loss Cap**| Max 2 consecutive losses per day | Max 2 consecutive losses per day |
+| Feature | BTCUSD (Bitcoin Anchor) | SOLUSD (Solana High-Beta) | ALTS BASKET (ETH, AVAX, NEAR, LINK) |
+| :--- | :--- | :--- | :--- |
+| **Capital Allocation** | **40% Portfolio Capital** | **30% Portfolio Capital** | **30% Portfolio Capital** |
+| **Minimum Sweep Breach** | $\ge \mathbf{0.12 \times \text{ATR}_{14}}$ ($\ge \$50.00$) | $\ge \mathbf{0.15 \times \text{ATR}_{14}}$ ($\ge \$0.50$) | $\ge \mathbf{0.18 \times \text{ATR}_{14}}$ (Symbol ATR Scaled) |
+| **Peak Volume Killzone**| US ETF Open (07:00–10:30 PM IST) | US Cash & London Overlap (05:30–10:30 PM IST) | Global Session Momentum (05:30–11:30 PM IST) |
+| **Trend Confluence Filter** | H1 EMA 50/200 + DXY Inversion | H1 EMA 50/200 + BTC Correlation | H1 EMA 50/200 + BTC Beta Alignment |
+| **FVG Limit Retest Timeout**| Dynamic (6–12 M1 Bars) | Dynamic (10–20 M1 Bars) | Dynamic (10–20 M1 Bars) |
+| **Breakeven Ratchet** | Trigger: **+2.00R** (Buffer: +0.10R) | Trigger: **+2.00R** (Buffer: +0.10R) | Trigger: **+2.00R** (Buffer: +0.10R) |
+| **Tranche 1 Bank** | **35% @ +1.50R** (SL $\to$ -0.40R) | **35% @ +1.50R** (SL $\to$ -0.40R) | **35% @ +1.50R** (SL $\to$ -0.40R) |
+| **Tranche 2 Target** | Dynamic 2.20R–3.50R (+1.00R Lock) | Dynamic 2.20R–3.50R (+1.00R Lock) | Dynamic 2.20R–3.50R (+1.00R Lock) |
+| **Tranche 3 Moonbag** | 30% Vol (Chandelier 4.2x / 3.0x ATR) | 30% Vol (Chandelier 5.2x / 3.8x ATR) | 30% Vol (Chandelier 5.2x / 3.8x ATR) |
+| **Stagnation Exit Limit** | Dynamic 15–30 M1 Bars ($< 0.30\text{R}$) | Dynamic 30–50 M1 Bars ($< 0.30\text{R}$) | Dynamic 25–45 M1 Bars ($< 0.30\text{R}$) |
+| **Post-Loss Cooldown** | **45 Minutes** (Macro Reset) | **15 Minutes** (Fast Momentum Catchup) | **20 Minutes** (Per-Symbol Decoupled) |
+| **Consecutive Loss Cap**| Max 2 consecutive losses per day | Max 2 consecutive losses per day | Max 2 consecutive losses per symbol |
 
 ---
 
@@ -387,20 +410,21 @@ Aap directly browser mein **`http://localhost:3000/godfather`** open kar sakte h
 Agar aap is system ko manually charts par execute karna chahte hain, toh har trade se pehle yeh checklist follow karein:
 
 - [ ] **1. Macro News & Funding Check**: Kya agle 30 minute mein koi US Red Folder News (CPI, NFP, FOMC) ya 8-Hour Funding Reset (05:30 AM, 01:30 PM, 09:30 PM IST) hai? *(Agar haan, trade na lein)*.
-- [ ] **2. Chop Check**: Kya M15/H1 par Choppiness Index > 61.8 ya ADX < 20 hai? *(Agar haan, chart band karein)*.
+- [ ] **2. Chop Check**: Kya M15/H1 par Choppiness Index > 61.8 ya ADX < 20 hai? *(Agar haan, trading pause karein)*.
 - [ ] **3. Macro Trend (H1)**: Kya price H1 50 EMA ke upar hai (Bullish) ya neeche (Bearish)?
 - [ ] **4. M15 Key Liquidity**: Pichhle swing high (BSL) ya swing low (SSL) level kahan hai?
-- [ ] **5. M1 Liquidity Sweep & Shift**:
-  - Kya price ne level ko sweep kiya? (BTC $\ge \$50$ / SOL $\ge \$0.50$).
+- [ ] **5. Dynamic M1 Liquidity Sweep & Shift**:
+  - Kya price ne level ko sweep kiya? (Dynamic ATR-scaled sweep breach).
   - Kya wick rejection aur tick delta absorption dikhi?
-  - Kya M1 structure break (MSS) hua with a big body displacement candle ($0.60\times\text{ATR}$)?
+  - Kya M1 structure break (MSS) hua with a big body displacement candle ($\ge 0.60 \times \text{ATR}_{1}$)?
 - [ ] **6. FVG Entry & Exact Risk**:
-  - FVG zone mark karein aur limit order lagayein.
+  - FVG zone mark karein aur limit order lagayein (Dynamic buffer: $0.15 \times \text{ATR}$).
   - Formula use karke exact 0.85% ya 1.5% risk ke mutabiq exact quantity calculate karein.
-- [ ] **7. 3-Tranche Execution**:
-  - +1.00R par 25% close karein aur SL Breakeven par shift karein.
-  - +2.00R (BTC) / +2.50R (SOL) par 35% close karein.
-  - Remaining 40% par Chandelier ATR trail lagakar bada moonbag runner enjoy karein.
+- [ ] **7. Dynamic 3-Tranche Execution**:
+  - +1.50R par 35% close karein aur SL ko -0.40R par ratchet karein.
+  - +2.00R par SL ko Breakeven (+0.10R buffer) par lock karein.
+  - Dynamic R2 target (2.2R–3.5R) par 35% close karein aur SL ko +1.00R Profit Lock par set karein.
+  - Remaining 30% par Dynamic Chandelier ATR trailing stop lagakar ride karein.
 
 ---
 

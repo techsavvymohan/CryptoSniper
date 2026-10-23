@@ -32,14 +32,23 @@ redis-cli get "execution:kill-switch"
 pnpm migrate
 ```
 
-### Step 3: Secret & Configuration Validation
+### Step 3: Local Test Suite & Build Verification (Native CLI)
+```powershell
+# 1. Verify all 24 automated unit tests pass (100% green) across monorepo packages
+pnpm test
+
+# 2. Verify all 13 monorepo packages compile cleanly with zero TypeScript errors
+pnpm -r build
+```
+
+### Step 4: Secret & Configuration Validation
 - Verify that `.env` contains valid credentials and matches the intended venue (`paper` or `hyperliquid` / `bybit`).
 - Ensure `SIMULATION_MODE=true` if testing MEV cross-DEX loops.
 - Verify wallet address balances (SOL for rent/gas, USDC for capital).
 
-### Step 4: Launch Orchestrator & Dashboard
+### Step 5: Launch Orchestrator & Dashboard
 ```powershell
-# Terminal 1: Launch Core Orchestrator
+# Terminal 1: Launch Core Orchestrator (Solana MEV + Godfather Triad Manager)
 pnpm start
 
 # Terminal 2: Launch Monitoring Dashboard
