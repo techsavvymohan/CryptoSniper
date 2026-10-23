@@ -515,10 +515,10 @@ Community Pine Script indicators evaluate unclosed candles (Bar 0), repainting o
 
 ## Chapter 7: Complete Monorepo Codebase Audit & Module-by-Module Blueprint
 
-The underlying repository (`solana-mev-arbitrage-bot`) provides the complete production infrastructure supporting this dual-engine quantitative crypto fund system:
+The underlying repository (`CryptoSniper`) provides the complete production infrastructure supporting this dual-engine quantitative crypto fund system:
 
 ```
-solana-mev-arbitrage-bot/
+CryptoSniper/
 │
 ├── apps/
 │   ├── main/

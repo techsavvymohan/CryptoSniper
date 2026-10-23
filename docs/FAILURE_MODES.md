@@ -1,6 +1,6 @@
 # 🛡️ Failure Modes, Detection & Automated Mitigations
 
-> **Scope**: Exhaustive catalog of failure modes, threat models, automated mitigations, and human escalation protocols for `solana-mev-arbitrage-bot`.
+> **Scope**: Exhaustive catalog of failure modes, threat models, automated mitigations, and human escalation protocols for `CryptoSniper`.
 
 ---
 

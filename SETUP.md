@@ -195,8 +195,8 @@ You don't need all of these on day one, but it's good to start sign-ups while in
 Open PowerShell in the folder where you keep projects:
 
 ```powershell
-git clone <your-repo-url>
-cd solana-mev-arbitrage-bot
+git clone https://github.com/techsavvymohan/CryptoSniper.git
+cd CryptoSniper
 ```
 
 Now install all the monorepo packages:

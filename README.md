@@ -192,7 +192,7 @@ The execution layer in `packages/execution/src/directional/` provides a unified 
 ## 📁 Monorepo Structure
 
 ```
-solana-mev-arbitrage-bot/
+CryptoSniper/
 ├── apps/
 │   ├── main/                  # Core orchestrator — wires both MEV and Godfather engines
 │   └── dashboard/             # Next.js 14 monitoring UI (MEV Execution, Simulation, and Godfather)
