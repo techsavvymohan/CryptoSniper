@@ -16,9 +16,9 @@ export interface TrancheEvaluationResult {
 
 /**
  * Initializes the 3 discrete harvesting tranches for a new trade:
- * Tranche 1: 25% volume @ +1.00R (triggers Breakeven stop ratchet)
- * Tranche 2: 35% volume @ +2.00R to +2.50R
- * Tranche 3: 40% volume Moonbag runner (dynamic 3.0x ATR Chandelier Stop)
+ * Tranche 1: 35% volume @ +1.50R (triggers Breakeven stop ratchet)
+ * Tranche 2: 35% volume @ +2.50R
+ * Tranche 3: 30% volume Moonbag runner (dynamic 3.0x ATR Chandelier Stop)
  */
 export function createTranches(
   tradeId: string,
@@ -26,15 +26,15 @@ export function createTranches(
   stopLoss: number,
   totalSize: number,
   direction: TradeDirection,
-  targetR2 = 2.0,
+  targetR2 = 2.5,
 ): GodfatherTranche[] {
   const rDistance = Math.abs(entryPrice - stopLoss);
-  const size1 = parseFloat((totalSize * 0.25).toFixed(4));
+  const size1 = parseFloat((totalSize * 0.35).toFixed(4));
   const size2 = parseFloat((totalSize * 0.35).toFixed(4));
   // Allocate remaining volume to Tranche 3 to avoid rounding leakage
   const size3 = parseFloat((totalSize - size1 - size2).toFixed(4));
 
-  const t1Target = direction === 'BUY' ? entryPrice + rDistance : entryPrice - rDistance;
+  const t1Target = direction === 'BUY' ? entryPrice + 1.5 * rDistance : entryPrice - 1.5 * rDistance;
   const t2Target = direction === 'BUY' ? entryPrice + targetR2 * rDistance : entryPrice - targetR2 * rDistance;
 
   return [
@@ -42,9 +42,9 @@ export function createTranches(
       id: generateId(),
       tradeId,
       trancheNumber: 1,
-      targetRr: 1.0,
+      targetRr: 1.5,
       targetPrice: t1Target,
-      volumeFraction: 0.25,
+      volumeFraction: 0.35,
       size: size1,
       status: 'ACTIVE',
       realizedPnlUsd: 0,
@@ -66,7 +66,7 @@ export function createTranches(
       trancheNumber: 3,
       targetRr: undefined,
       targetPrice: undefined, // Moonbag runner
-      volumeFraction: 0.40,
+      volumeFraction: 0.30,
       size: size3,
       trailingStop: stopLoss,
       status: 'ACTIVE',
@@ -227,7 +227,7 @@ export function evaluateTrancheExits(
           },
         ],
         realizedPnlDeltaUsd: pnl,
-        message: `Tranche 1 (+1.00R) Banked! SL moved to Breakeven (${bePrice})`,
+        message: `Tranche 1 (+1.50R) Banked! SL moved to Breakeven (${bePrice})`,
       };
     }
   }

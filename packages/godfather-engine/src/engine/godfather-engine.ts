@@ -336,6 +336,9 @@ export class GodfatherEngine extends EventEmitter {
     }
 
     const sessionInfo = getCurrentSession(currentM1.closeTime);
+    if (sessionInfo.sessionName === 'OFF_SESSION') {
+      return; // Strict ICT Rule: Never trade outside London, NY/US ETF, or Asia Killzones
+    }
 
     // Fetch necessary candles
     const m15Bars = this.resampler.getCandles(symbol, 'M15', 40);

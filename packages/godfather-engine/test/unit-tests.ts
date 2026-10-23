@@ -239,14 +239,14 @@ describe('🎩 GODFATHER Math & Microstructure Layer', () => {
   });
 
   describe('5. 3-Tranche Lifecycle & Breakeven Ratchet', () => {
-    it('Initializes 25% / 35% / 40% tranches and locks Breakeven on Tranche 1 hit', () => {
-      const tranches = createTranches('trade-1', 67000, 66900, 1.0, 'BUY', 2.0);
+    it('Initializes 35% / 35% / 30% tranches and locks Breakeven on Tranche 1 hit', () => {
+      const tranches = createTranches('trade-1', 67000, 66900, 1.0, 'BUY', 2.5);
       assert.strictEqual(tranches.length, 3);
-      assert.strictEqual(tranches[0]!.size, 0.25);
-      assert.strictEqual(tranches[0]!.targetPrice, 67100); // +1.00R
+      assert.strictEqual(tranches[0]!.size, 0.35);
+      assert.strictEqual(tranches[0]!.targetPrice, 67150); // +1.50R
       assert.strictEqual(tranches[1]!.size, 0.35);
-      assert.strictEqual(tranches[1]!.targetPrice, 67200); // +2.00R
-      assert.strictEqual(tranches[2]!.size, 0.40);
+      assert.strictEqual(tranches[1]!.targetPrice, 67250); // +2.50R
+      assert.strictEqual(tranches[2]!.size, 0.30);
 
       const trade = {
         id: 'trade-1',
@@ -265,15 +265,15 @@ describe('🎩 GODFATHER Math & Microstructure Layer', () => {
         tranches,
       };
 
-      // Bar reaching 67110 triggers Tranche 1
+      // Bar reaching 67160 triggers Tranche 1 (+1.50R)
       const hitCandle: Candle = {
         symbol: 'BTCUSD',
         timeframe: 'M1',
         openTime: 60000,
         open: 67050,
-        high: 67110,
+        high: 67160,
         low: 67040,
-        close: 67090,
+        close: 67155,
         volume: 10,
         closeTime: 120000,
         isClosed: true,
@@ -286,7 +286,7 @@ describe('🎩 GODFATHER Math & Microstructure Layer', () => {
         result.tradeUpdates?.stopLoss! > 67000,
         'Stop Loss should be ratcheted above entry (+0.10R buffer)',
       );
-      assert.strictEqual(result.realizedPnlDeltaUsd, 25); // (67100 - 67000) * 0.25 = 25 USD
+      assert.strictEqual(result.realizedPnlDeltaUsd, 52.5); // (67150 - 67000) * 0.35 = 52.5 USD
     });
   });
 

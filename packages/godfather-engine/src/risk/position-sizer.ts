@@ -35,7 +35,7 @@ export function calculateGodfatherPosition(params: PositionParams): PositionCalc
     isWeekend = false,
     hasCorrelatedUsdExposure = false,
     baseRiskPct = 0.85,
-    convictionScaleAPlus = 2.40,
+    convictionScaleAPlus = 1.25,
     convictionScaleA = 1.00,
     convictionScaleB = 0.50,
   } = params;
