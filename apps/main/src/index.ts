@@ -43,7 +43,7 @@ import {
   CryptoCandleFeedService,
   HyperliquidFootprintService,
 } from '@mev-research/market-feed';
-import { GodfatherEngine } from '@mev-research/godfather-engine';
+import { GodfatherEngine, GodfatherTriadManager } from '@mev-research/godfather-engine';
 import { OpportunityManager } from '@mev-research/spread-engine';
 import { SimulationRunner } from '@mev-research/simulation';
 import { AnalyticsService } from '@mev-research/analytics';
@@ -243,7 +243,8 @@ async function main() {
   }
 
   // ─── 6. The GODFATHER Quantitative Directional Scalper (Core Profit Engine) 
-  let godfatherEngine: GodfatherEngine | null = null;
+  // ─── 6. The GODFATHER Quantitative Directional Scalper (Core Profit Engine) 
+  let godfatherTriad: GodfatherTriadManager | null = null;
   let candleFeed: CryptoCandleFeedService | null = null;
   let footprintService: HyperliquidFootprintService | null = null;
   let directionalExecutor: ReturnType<typeof createDirectionalExecutor> | null = null;
@@ -265,25 +266,36 @@ async function main() {
     }
 
     candleFeed = new CryptoCandleFeedService(gfConfig.symbols);
-    godfatherEngine = new GodfatherEngine(
-      gfConfig,
-      candleFeed.getResampler(),
-      godfatherRepo,
-      config.execution.maxTradeCapitalUsdc,
-      directionalExecutor,
-      footprintService ?? undefined,
-    );
+
+    // 🏛️ Initialize 3 Separate Engines Running Concurrently:
+    // Engine 1: Dedicated BTC Engine (BTCUSD)
+    // Engine 2: Dedicated SOL Engine (SOLUSD)
+    // Engine 3: Dedicated Altcoins Basket Engine (DOGE, INJ, OP, AVAX, etc.)
+    godfatherTriad = new GodfatherTriadManager({
+      baseConfig: gfConfig,
+      resampler: candleFeed.getResampler(),
+      repository: godfatherRepo,
+      initialEquity: config.execution.maxTradeCapitalUsdc,
+      executor: directionalExecutor,
+      footprintService: footprintService ?? undefined,
+      btcSymbols: ['BTCUSD'],
+      solSymbols: ['SOLUSD'],
+      altsSymbols: gfConfig.symbols.filter(s => !s.toUpperCase().includes('BTC') && !s.toUpperCase().includes('SOL')),
+      btcEquityFraction: 0.40,
+      solEquityFraction: 0.30,
+      altsEquityFraction: 0.30,
+    });
 
     candleFeed.on('candle', (resample) => {
-      godfatherEngine?.onCandleUpdate(resample).catch(err => {
-        console.error('[Godfather] Candle processing error:', err.message);
+      godfatherTriad?.onCandleUpdate(resample).catch(err => {
+        console.error('[GodfatherTriad] Candle dispatch error:', err.message);
       });
     });
 
     // ─── Terminal Execution Displays (Zero Browser Needed) ────────────────────
-    godfatherEngine.on('signal', async (signal) => {
+    godfatherTriad.on('signal', async (signal) => {
       console.log(`\n=============================================================================`);
-      console.log(`🎯 [SIGNAL] ${signal.grade} ${signal.direction} on ${signal.symbol}`);
+      console.log(`🎯 [SIGNAL] [${signal.engineType}_ENGINE] ${signal.grade} ${signal.direction} on ${signal.symbol}`);
       console.log(`   Entry Price: $${signal.entryPrice.toFixed(2)} | Stop Loss: $${signal.stopLoss.toFixed(2)}`);
       console.log(`   Risk Allocated: $${signal.allocatedRiskUsd.toFixed(2)} | Session: ${signal.session}`);
       console.log(`=============================================================================\n`);
@@ -295,14 +307,14 @@ async function main() {
         symbol: signal.symbol,
         venue: gfConfig.venue,
         status: 'SUCCESS',
-        details: { grade: signal.grade, direction: signal.direction, entry: signal.entryPrice, stopLoss: signal.stopLoss, riskUsd: signal.allocatedRiskUsd },
+        details: { engineType: signal.engineType, grade: signal.grade, direction: signal.direction, entry: signal.entryPrice, stopLoss: signal.stopLoss, riskUsd: signal.allocatedRiskUsd },
       }).catch(() => {});
     });
 
-    godfatherEngine.on('trade_opened', async (trade) => {
-      console.log(`\n🚀 [TRADE OPENED] ${trade.direction} ${trade.symbol}`);
+    godfatherTriad.on('trade_opened', async (trade) => {
+      console.log(`\n🚀 [TRADE OPENED] [${trade.engineType}_ENGINE] ${trade.direction} ${trade.symbol}`);
       console.log(`   Size: ${trade.totalSize} | Entry: $${trade.entryPrice.toFixed(2)} | SL: $${trade.stopLoss.toFixed(2)}`);
-      console.log(`   Tranche 1 TP: +1.00R | Tranche 2 TP: +2.00R | Tranche 3: Trailing ATR`);
+      console.log(`   Tranche 1 TP: +1.50R | Tranche 2 TP: +3.00R | Tranche 3: Trailing ATR`);
       console.log(`-----------------------------------------------------------------------------\n`);
 
       await publishEvent(CHANNELS.GODFATHER_TRADES, { type: 'TRADE_OPENED', payload: trade });
@@ -312,12 +324,12 @@ async function main() {
         symbol: trade.symbol,
         venue: gfConfig.venue,
         status: 'SUCCESS',
-        details: { size: trade.totalSize, entry: trade.entryPrice, stopLoss: trade.stopLoss },
+        details: { engineType: trade.engineType, size: trade.totalSize, entry: trade.entryPrice, stopLoss: trade.stopLoss },
       }).catch(() => {});
     });
 
-    godfatherEngine.on('tranche_exit', async ({ trade, result }) => {
-      console.log(`\n🎯 [TRANCHE UPDATE] ${trade.symbol} ${result.action}: ${result.message}`);
+    godfatherTriad.on('tranche_exit', async ({ trade, result, engineType }) => {
+      console.log(`\n🎯 [TRANCHE UPDATE] [${engineType}_ENGINE] ${trade.symbol} ${result.action}: ${result.message}`);
       console.log(`   Realized Profit Banked: +$${result.realizedPnlDeltaUsd.toFixed(2)}`);
       if (trade.isBreakevenLocked) {
         console.log(`   🛡️ BREAKEVEN RATCHET LOCKED: Trade is now 100% Risk-Free (SL at entry + 0.10R)!`);
@@ -331,13 +343,13 @@ async function main() {
         symbol: trade.symbol,
         venue: gfConfig.venue,
         status: 'SUCCESS',
-        details: { action: result.action, message: result.message, pnlDelta: result.realizedPnlDeltaUsd },
+        details: { engineType, action: result.action, message: result.message, pnlDelta: result.realizedPnlDeltaUsd },
       }).catch(() => {});
     });
 
-    godfatherEngine.on('trade_closed', async (trade) => {
+    godfatherTriad.on('trade_closed', async (trade) => {
       const isWin = trade.realizedPnlUsd >= 0;
-      console.log(`\n🏁 [TRADE CLOSED] ${trade.symbol} ${trade.direction}`);
+      console.log(`\n🏁 [TRADE CLOSED] [${trade.engineType}_ENGINE] ${trade.symbol} ${trade.direction}`);
       console.log(`   Exit Reason: ${trade.exitReason}`);
       console.log(`   Total Realized P&L: ${isWin ? '🟢 +$' : '🔴 -$'}${Math.abs(trade.realizedPnlUsd).toFixed(2)}`);
       console.log(`=============================================================================\n`);
@@ -350,20 +362,28 @@ async function main() {
         symbol: trade.symbol,
         venue: gfConfig.venue,
         status: isWin ? 'SUCCESS' : 'FAILED',
-        details: { exitReason: trade.exitReason, realizedPnlUsd: trade.realizedPnlUsd },
+        details: { engineType: trade.engineType, exitReason: trade.exitReason, realizedPnlUsd: trade.realizedPnlUsd },
       }).catch(() => {});
     });
 
-    godfatherEngine.on('alert', (msg) => {
-      console.warn('[Godfather] Alert:', msg);
+    godfatherTriad.on('alert', (msg) => {
+      console.warn('[GodfatherTriad] Alert:', msg);
     });
 
     try {
-      await godfatherEngine.start();
+      // 🚀 Start all 3 engines simultaneously in parallel!
+      await godfatherTriad.start();
       await candleFeed.start();
-      console.log(`[STARTUP] 🎩 The Godfather active on [${gfConfig.symbols.join(', ')}] | Venue: ${gfConfig.venue.toUpperCase()}`);
+      const triadStatus = godfatherTriad.getStatus();
+      console.log(`\n=============================================================================`);
+      console.log(`🏛️ [STARTUP] THE GODFATHER TRIAD ACTIVE — 3 ENGINES RUNNING SIMULTANEOUSLY:`);
+      console.log(`   ⚡ Engine 1 (BTC):  [${triadStatus.engines.btc.symbols.join(', ')}]`);
+      console.log(`   ⚡ Engine 2 (SOL):  [${triadStatus.engines.sol.symbols.join(', ')}]`);
+      console.log(`   ⚡ Engine 3 (ALTS): [${triadStatus.engines.alts.symbols.join(', ')}]`);
+      console.log(`   • Execution Venue:  ${gfConfig.venue.toUpperCase()}`);
+      console.log(`=============================================================================\n`);
     } catch (err) {
-      console.error('[STARTUP] Failed to start Godfather Engine:', err);
+      console.error('[STARTUP] Failed to start Godfather Triad Engines:', err);
     }
   }
 
@@ -413,7 +433,7 @@ async function main() {
       executionEngine ? executionEngine['riskEngine'] : ({} as any),
       config.api.port,
       godfatherRepo,
-      godfatherEngine,
+      godfatherTriad,
     );
   } catch { /* optional */ }
 
@@ -430,7 +450,7 @@ async function main() {
   // ─── 10. Graceful Shutdown ──────────────────────────────────────────────────
   const shutdown = async () => {
     console.log('\n[SHUTDOWN] Stopping bot...');
-    godfatherEngine?.stop();
+    godfatherTriad?.stop();
     candleFeed?.stop();
     footprintService?.stop();
     await directionalExecutor?.stop();

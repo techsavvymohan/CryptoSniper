@@ -60,18 +60,21 @@ export interface PendingSignal {
   barsElapsed: number;
   maxRetestBars: number;
   targetR2: number;
+  venueOrderId?: string;
 }
 
 export class GodfatherEngine extends EventEmitter {
   private config: GodfatherConfig;
   private resampler: CausalMultiTFResampler;
   private repository?: GodfatherRepositoryInterface;
-  private executor?: { executeOrder(req: any): Promise<any>; cancelOrder?(orderId: string, symbol?: string): Promise<any> };
+  private executor?: { executeOrder(req: any): Promise<any>; cancelOrder?(arg1: string, arg2?: string): Promise<any> };
   private footprintService?: { isSweepAbsorbed(symbol: string, direction: 'BUY' | 'SELL'): boolean; getSnapshot?(symbol: string): any };
   private activeTrades = new Map<string, { trade: GodfatherTrade; barsInTrade: number }>();
   private pendingSignals = new Map<string, PendingSignal>();
   private accountEquity: number;
   private isRunning = false;
+  private dailyRealizedPnl = 0;
+  private currentPnlDateStr = '';
 
   constructor(
     config: GodfatherConfig,
@@ -236,7 +239,18 @@ export class GodfatherEngine extends EventEmitter {
         }
 
         if (this.executor && 'cancelOrder' in this.executor) {
-          (this.executor as any).cancelOrder(signal.id, signal.symbol).catch(() => {});
+          const orderToCancel = pending.venueOrderId || signal.id;
+          try {
+            // First attempt: adapter standard (symbol, orderId)
+            await (this.executor as any).cancelOrder(signal.symbol, orderToCancel);
+          } catch {
+            try {
+              // Fallback attempt: factory standard (orderId, symbol)
+              await (this.executor as any).cancelOrder(orderToCancel, signal.symbol);
+            } catch {
+              // Non-fatal logging
+            }
+          }
         }
 
         this.emit('alert', `[Godfather] Limit order on ${signal.symbol} expired after ${pending.barsElapsed} bars without retest`);
@@ -253,10 +267,19 @@ export class GodfatherEngine extends EventEmitter {
     const m15Bars = this.resampler.getCandles(symbol, 'M15', 30);
     const m15AtrSeries = calculateWilderATR(m15Bars, 14);
     const m15Atr = m15AtrSeries.length > 0 ? m15AtrSeries[m15AtrSeries.length - 1]! : 0;
+    const m15Chop = m15Bars.length >= 14 ? calculateChoppiness(m15Bars, 14) : 50;
 
-    const maxStagnationBars = symbol.toUpperCase().includes('BTC')
+    const isBtc = symbol.toUpperCase().includes('BTC');
+    const baseStagnation = isBtc
       ? Math.max(this.config.btcRetestMaxBars * 4, 32)
       : Math.max(this.config.solRetestMaxBars * 3, 36);
+
+    // Dynamic Stagnation Window:
+    // Fast momentum / clean trend (chop < 42): fail-fast on stagnant trades (26-28 bars);
+    // Ranging / consolidation regime (chop >= 55): allow more breathing room (40-44 bars)
+    const dynamicStagnationBars = m15Chop < 42.0
+      ? Math.max(baseStagnation - 6, 26)
+      : (m15Chop > 55.0 ? baseStagnation + 8 : baseStagnation);
 
     for (const [tradeId, activeEntry] of this.activeTrades.entries()) {
       const { trade, barsInTrade } = activeEntry;
@@ -269,10 +292,18 @@ export class GodfatherEngine extends EventEmitter {
         currentCandle,
         m15Atr,
         activeEntry.barsInTrade,
-        maxStagnationBars,
+        dynamicStagnationBars,
+        m15Chop,
       );
 
       if (evalResult.action !== 'NONE') {
+        const todayUtc = new Date(currentCandle.closeTime).toISOString().split('T')[0]!;
+        if (this.currentPnlDateStr !== todayUtc) {
+          this.currentPnlDateStr = todayUtc;
+          this.dailyRealizedPnl = 0;
+        }
+        this.dailyRealizedPnl += evalResult.realizedPnlDeltaUsd;
+
         // Apply trade updates
         if (evalResult.tradeUpdates) {
           Object.assign(trade, evalResult.tradeUpdates);
@@ -325,7 +356,11 @@ export class GodfatherEngine extends EventEmitter {
     ).length;
     if (activeCount >= 5) return;
 
-    // Check circuit breaker: Daily loss limit
+    // Check circuit breaker: Daily loss limit (both in-memory and database verified)
+    if (this.dailyRealizedPnl <= -this.config.dailyLossLimitUsdc) {
+      return; // In-memory daily loss limit hit, skip
+    }
+
     if (this.repository) {
       try {
         const todayRealizedPnl = await this.repository.getDailyPnl(new Date(currentM1.closeTime));
@@ -333,7 +368,7 @@ export class GodfatherEngine extends EventEmitter {
           return; // Daily loss limit hit, skip
         }
       } catch {
-        // Proceed on DB query failure
+        // Fallback to in-memory check
       }
     }
 
@@ -386,22 +421,64 @@ export class GodfatherEngine extends EventEmitter {
 
     const isBtc = symbol.toUpperCase().includes('BTC');
     const isSol = symbol.toUpperCase().includes('SOL');
+
+    // 1. Dynamic Volatility-Scaled Sweep Breach
+    // Calibrates automatically with real-time M15 ATR:
+    // BTC: 0.25x M15 ATR (floored at $35 to prevent micro-noise in dead zones)
+    // SOL: 0.25x M15 ATR (floored at $0.25)
+    // Alts: 0.35x M15 ATR or 0.05% of asset price
     const minSweepBreachUsd = isBtc
-      ? this.config.btcSweepMinBreachUsd
+      ? Math.max(m15Atr * 0.25, 35.0)
       : isSol
-      ? this.config.solSweepMinBreachUsd
+      ? Math.max(m15Atr * 0.25, 0.25)
       : Math.max(m15Atr * 0.35, currentM1.close * 0.0005);
 
-    const minFvgGapUsd = isBtc ? 10.0 : isSol ? 0.10 : Math.max(m15Atr * 0.05, currentM1.close * 0.0001);
-    const buffer = isBtc ? 15.0 : Math.max(m15Atr * 0.40, currentM1.close * 0.0003);
+    // 2. Dynamic FVG Gap Imbalance Threshold
+    // Calibrated directly to M1 ATR (20% of M1 ATR), dynamically adapting to explosive expansions
+    const minFvgGapUsd = isBtc
+      ? Math.max(m1Atr * 0.20, 8.0)
+      : isSol
+      ? Math.max(m1Atr * 0.20, 0.08)
+      : Math.max(m1Atr * 0.20, currentM1.close * 0.0001);
+
+    // 3. Dynamic Stop Loss Buffer
+    // Calibrated off M15 ATR to give liquidity wicks breathing room without overexposing risk
+    const buffer = isBtc
+      ? Math.max(m15Atr * 0.15, 12.0)
+      : isSol
+      ? Math.max(m15Atr * 0.25, 0.15)
+      : Math.max(m15Atr * 0.40, currentM1.close * 0.0003);
+
+    // 4. Dynamic Retest Window based on Regime Choppiness
+    // In strong momentum (chop < 42.0), limit retests must occur quickly (6-8 bars).
+    // In slower consolidation (chop >= 42.0), allow 10-14 bars.
+    const dynamicRetestBars = isBtc
+      ? (chop < 42.0 ? 6 : (chop > 55.0 ? 12 : this.config.btcRetestMaxBars))
+      : isSol
+      ? (chop < 42.0 ? 8 : (chop > 55.0 ? 14 : this.config.solRetestMaxBars))
+      : (chop < 42.0 ? 8 : 12);
+
+    // 5. Dynamic Harvesting Target R2
+    // In clean directional trends (chop < 38.2), stretch runner target to 3.0R (BTC) / 3.5R (Alts).
+    // In choppy regimes (chop > 52.0), secure target early at 2.2R (BTC) / 2.5R (Alts).
+    const dynamicTargetR2 = chop < 38.2
+      ? (isBtc ? 3.0 : 3.5)
+      : chop > 52.0
+      ? (isBtc ? 2.2 : 2.5)
+      : (isBtc ? 2.5 : 3.0);
+
+    // 6. Dynamic Sweep Lookback & Displacement
+    const sweepWindow = chop < 42.0 ? 8 : (chop > 55.0 ? 14 : 10);
+    const minBodyFraction = chop < 42.0 ? 0.65 : 0.58;
+    const minRangeMultiplier = chop < 42.0 ? 0.65 : 0.58;
 
     // ==========================================
     // 1. EVALUATE BULLISH SETUP (Sweep of SSL)
     // ==========================================
     if (ssl) {
-      const sweep = detectSweepAndReclaim(m1Bars, ssl, minSweepBreachUsd, 10);
+      const sweep = detectSweepAndReclaim(m1Bars, ssl, minSweepBreachUsd, sweepWindow);
       if (sweep.isSweep && sweep.sweepCandle && sweep.reclaimCandle) {
-        const hasDisplacement = checkDisplacement(sweep.reclaimCandle, m1Atr, 0.60, 0.60);
+        const hasDisplacement = checkDisplacement(sweep.reclaimCandle, m1Atr, minBodyFraction, minRangeMultiplier);
         const mss = checkMSS(m1Bars, 'BUY', 5);
         const fvg = detectFVG(m1Bars, 'BUY', minFvgGapUsd);
         const deltaAbsorbed = this.footprintService
@@ -431,6 +508,9 @@ export class GodfatherEngine extends EventEmitter {
             h1Trend,
             detectedAt: currentM1.closeTime,
             currentCandle: currentM1,
+            chop,
+            maxRetestBars: dynamicRetestBars,
+            targetR2: dynamicTargetR2,
           });
           return;
         }
@@ -441,9 +521,9 @@ export class GodfatherEngine extends EventEmitter {
     // 2. EVALUATE BEARISH SETUP (Sweep of BSL)
     // ==========================================
     if (bsl) {
-      const sweep = detectSweepAndReclaim(m1Bars, bsl, minSweepBreachUsd, 10);
+      const sweep = detectSweepAndReclaim(m1Bars, bsl, minSweepBreachUsd, sweepWindow);
       if (sweep.isSweep && sweep.sweepCandle && sweep.reclaimCandle) {
-        const hasDisplacement = checkDisplacement(sweep.reclaimCandle, m1Atr, 0.60, 0.60);
+        const hasDisplacement = checkDisplacement(sweep.reclaimCandle, m1Atr, minBodyFraction, minRangeMultiplier);
         const mss = checkMSS(m1Bars, 'SELL', 5);
         const fvg = detectFVG(m1Bars, 'SELL', minFvgGapUsd);
         const deltaAbsorbed = this.footprintService
@@ -472,6 +552,9 @@ export class GodfatherEngine extends EventEmitter {
             h1Trend,
             detectedAt: currentM1.closeTime,
             currentCandle: currentM1,
+            chop,
+            maxRetestBars: dynamicRetestBars,
+            targetR2: dynamicTargetR2,
           });
           return;
         }
@@ -494,6 +577,9 @@ export class GodfatherEngine extends EventEmitter {
     h1Trend: string;
     detectedAt: number;
     currentCandle?: Candle;
+    chop?: number;
+    maxRetestBars?: number;
+    targetR2?: number;
   }): Promise<void> {
     const {
       symbol,
@@ -510,6 +596,9 @@ export class GodfatherEngine extends EventEmitter {
       h1Trend,
       detectedAt,
       currentCandle,
+      chop,
+      maxRetestBars,
+      targetR2,
     } = params;
 
     let sessionMultiplier = 1.00;
@@ -517,6 +606,15 @@ export class GodfatherEngine extends EventEmitter {
       sessionMultiplier = 1.35;
     } else if (session.startsWith('US_')) {
       sessionMultiplier = 0.75;
+    }
+
+    // Dynamic regime multiplier: scale conviction dynamically with Choppiness Index
+    if (chop !== undefined) {
+      if (chop > 52.0) {
+        sessionMultiplier *= 0.85; // dial back risk when chop rises
+      } else if (chop < 38.2) {
+        sessionMultiplier *= 1.15; // boost conviction during clean trending regimes
+      }
     }
 
     const sizing = calculateGodfatherPosition({
@@ -540,12 +638,6 @@ export class GodfatherEngine extends EventEmitter {
     }
 
     const isBtc = symbol.toUpperCase().includes('BTC');
-    const isImmediateFill = currentCandle
-      ? (direction === 'BUY'
-          ? currentCandle.low <= entryPrice
-          : currentCandle.high >= entryPrice)
-      : true;
-
     const signalId = generateId();
     const signal: GodfatherSignal = {
       id: signalId,
@@ -564,9 +656,8 @@ export class GodfatherEngine extends EventEmitter {
       positionSize: sizing.positionSize,
       session,
       h1Trend,
-      status: isImmediateFill ? 'FILLED' : 'PENDING_FILL',
+      status: 'PENDING_FILL',
       detectedAt,
-      filledAt: isImmediateFill ? detectedAt : undefined,
     };
 
     if (this.repository) {
@@ -579,17 +670,29 @@ export class GodfatherEngine extends EventEmitter {
 
     this.emit('signal', signal);
 
-    const targetR2 = isBtc ? 2.5 : 3.0;
+    const resolvedTargetR2 = targetR2 ?? (isBtc ? 2.5 : 3.0);
+    const resolvedMaxRetestBars = maxRetestBars ?? (isBtc ? this.config.btcRetestMaxBars : this.config.solRetestMaxBars);
+
     const tranches = createTranches(
       signalId,
       entryPrice,
       stopLoss,
       sizing.positionSize,
       direction,
-      targetR2,
+      resolvedTargetR2,
     );
 
-    // Send limit order to execution venue
+    const pendingEntry: PendingSignal = {
+      signal,
+      barsElapsed: 0,
+      maxRetestBars: resolvedMaxRetestBars,
+      targetR2: resolvedTargetR2,
+    };
+
+    // Register into pendingSignals map for limit retest tracking
+    this.pendingSignals.set(signalId, pendingEntry);
+
+    // Send limit order to execution venue and capture venueOrderId
     if (this.executor) {
       this.executor.executeOrder({
         signalId,
@@ -604,54 +707,15 @@ export class GodfatherEngine extends EventEmitter {
           targetPrice: t.targetPrice,
           size: t.size,
         })),
+      }).then(res => {
+        if (res?.orderId) {
+          pendingEntry.venueOrderId = res.orderId;
+        }
       }).catch(err => {
         this.emit('alert', `Order execution failed on venue: ${err}`);
       });
     }
 
-    if (!isImmediateFill) {
-      // Register into pendingSignals map for limit retest tracking
-      const maxRetestBars = isBtc ? this.config.btcRetestMaxBars : this.config.solRetestMaxBars;
-      this.pendingSignals.set(signalId, {
-        signal,
-        barsElapsed: 0,
-        maxRetestBars,
-        targetR2,
-      });
-      this.emit('pending_order', { signal, maxRetestBars });
-      return;
-    }
-
-    // Immediate fill: instantiate trade with 3-tranche management
-    const tradeId = generateId();
-    const trade: GodfatherTrade = {
-      id: tradeId,
-      signalId,
-      symbol,
-      direction,
-      entryPrice,
-      stopLoss,
-      initialStopLoss: stopLoss,
-      breakevenPrice: entryPrice,
-      isBreakevenLocked: false,
-      totalSize: sizing.positionSize,
-      remainingSize: sizing.positionSize,
-      realizedPnlUsd: 0,
-      status: 'OPEN',
-      openedAt: detectedAt,
-      tranches,
-    };
-
-    this.activeTrades.set(tradeId, { trade, barsInTrade: 0 });
-
-    if (this.repository) {
-      try {
-        await this.repository.insertTrade(trade);
-      } catch (err) {
-        // Non-fatal logging
-      }
-    }
-
-    this.emit('trade_opened', trade);
+    this.emit('pending_order', { signal, maxRetestBars: resolvedMaxRetestBars });
   }
 }

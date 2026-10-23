@@ -77,6 +77,26 @@ export function createTranches(
 
 /**
  * Evaluates trade state against current closed M1 bar.
+/**
+ * Calculates dynamic Chandelier stop multiplier based on real-time market regime (Choppiness Index):
+ * In strong trends (chop < 38.2): expands multiplier up to 4.2x (BTC) / 5.2x (Alts) to capture massive runner legs.
+ * In choppy regimes (chop > 55.0): tightens multiplier to 3.0x (BTC) / 3.8x (Alts) to secure profits before whipsaws.
+ */
+export function getDynamicChandelierMultiplier(symbol?: string, chop?: number): number {
+  const isBtc = symbol?.toUpperCase().includes('BTC');
+  const baseMult = isBtc ? 3.5 : 4.5;
+  if (chop === undefined) return baseMult;
+
+  if (chop < 38.2) {
+    return isBtc ? 4.2 : 5.2;
+  } else if (chop > 55.0) {
+    return isBtc ? 3.0 : 3.8;
+  }
+  return baseMult;
+}
+
+/**
+ * Evaluates active tranches and stop-loss logic against a new closed candle.
  */
 export function evaluateTrancheExits(
   trade: GodfatherTrade,
@@ -84,6 +104,7 @@ export function evaluateTrancheExits(
   atr: number,
   barsInTrade: number,
   maxStagnationBars = 36,
+  chop?: number,
 ): TrancheEvaluationResult {
   if (trade.status !== 'OPEN') {
     return { action: 'NONE', realizedPnlDeltaUsd: 0 };
@@ -221,7 +242,7 @@ export function evaluateTrancheExits(
           initialStopLoss: trade.initialStopLoss ?? stopLoss,
           breakevenPrice: bePrice,
           isBreakevenLocked: false,
-          remainingSize: trade.remainingSize - t1.size,
+          remainingSize: parseFloat((trade.remainingSize - t1.size).toFixed(4)),
           realizedPnlUsd: trade.realizedPnlUsd + pnl,
         },
         trancheUpdates: [
@@ -287,7 +308,7 @@ export function evaluateTrancheExits(
         tradeUpdates: {
           stopLoss: profitLockSl,
           isBreakevenLocked: true,
-          remainingSize: trade.remainingSize - t2.size,
+          remainingSize: parseFloat((trade.remainingSize - t2.size).toFixed(4)),
           realizedPnlUsd: trade.realizedPnlUsd + pnl,
         },
         trancheUpdates: [
@@ -300,6 +321,12 @@ export function evaluateTrancheExits(
               closedAt: currentCandle.closeTime,
             },
           },
+          ...(t3 ? [{
+            id: t3.id,
+            updates: {
+              trailingStop: profitLockSl,
+            },
+          }] : []),
         ],
         realizedPnlDeltaUsd: pnl,
         message: `Tranche 2 Banked at ${exitPrice}! Stop Loss ratcheted to +1.00R Profit Lock (${profitLockSl.toFixed(2)})`,
@@ -308,8 +335,12 @@ export function evaluateTrancheExits(
   }
 
   // Check Tranche 3 (Moonbag Runner with Chandelier ATR Trailing Stop)
-  if (t3) {
-    const currentTrail = t3.trailingStop ?? stopLoss;
+  // The Moonbag Runner activates strictly after Tranche 2 has been banked, preventing premature close of active tranches
+  const t2Taken = trade.tranches.find(t => t.trancheNumber === 2)?.status === 'TAKEN';
+  if (t3 && t2Taken) {
+    const currentTrail = direction === 'BUY'
+      ? Math.max(t3.trailingStop ?? stopLoss, trade.stopLoss)
+      : Math.min(t3.trailingStop ?? stopLoss, trade.stopLoss);
 
     // Check if trailing stop hit
     const trailHit =
@@ -317,7 +348,7 @@ export function evaluateTrancheExits(
         ? currentCandle.low <= currentTrail
         : currentCandle.high >= currentTrail;
 
-    if (trailHit && trade.isBreakevenLocked) {
+    if (trailHit) {
       const exitPrice = currentTrail;
       const pnl =
         direction === 'BUY'
@@ -349,11 +380,9 @@ export function evaluateTrancheExits(
       };
     }
 
-    // Ratchet Trailing Stop up (BUY) or down (SELL) via dynamic ATR
-    // 3.5x ATR on BTC, 4.5x ATR on explosive Altcoins
+    // Ratchet Trailing Stop up (BUY) or down (SELL) via dynamic ATR calibrated by Choppiness Index
     if (atr > 0) {
-      const isBtc = trade.symbol?.toUpperCase().includes('BTC');
-      const chandelierMultiplier = isBtc ? 3.5 : 4.5;
+      const chandelierMultiplier = getDynamicChandelierMultiplier(trade.symbol, chop);
       const chandelierDistance = chandelierMultiplier * atr;
       if (direction === 'BUY') {
         const potentialTrail = currentCandle.high - chandelierDistance;

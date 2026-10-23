@@ -34,14 +34,11 @@ SYMBOLS = [
     "DOGEUSDT",
     "SUIUSDT",
     "AVAXUSDT",
-    "NEARUSDT",
-    "LINKUSDT",
     "APTUSDT",
     "ARBUSDT",
     "OPUSDT",
     "WIFUSDT",
     "1000PEPEUSDT",
-    "TIAUSDT",
     "INJUSDT",
 ]
 TIMEFRAMES = ["15m", "5m"]

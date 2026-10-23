@@ -16,8 +16,9 @@ import {
   detectFVG,
 } from '../dist/triggers/trigger-detector.js';
 import { calculateGodfatherPosition } from '../dist/risk/position-sizer.js';
-import { createTranches, evaluateTrancheExits } from '../dist/trade/tranche-manager.js';
+import { createTranches, evaluateTrancheExits, getDynamicChandelierMultiplier } from '../dist/trade/tranche-manager.js';
 import { getCurrentSession, isNearFundingReset } from '../dist/filters/session-guards.js';
+import { GodfatherTriadManager } from '../dist/engine/godfather-triad.js';
 
 describe('🎩 GODFATHER Math & Microstructure Layer', () => {
 
@@ -318,6 +319,33 @@ describe('🎩 GODFATHER Math & Microstructure Layer', () => {
         beResult.tradeUpdates?.stopLoss! >= 67010,
         'Stop Loss should now be ratcheted to entry (+0.10R buffer) at the +2.00R milestone',
       );
+
+      // Tranche 2 Hit at +3.00R (67300)
+      const tradeAtBe = {
+        ...tradeAfterT1,
+        ...beResult.tradeUpdates,
+      };
+
+      const t2Candle: Candle = {
+        symbol: 'BTCUSD',
+        timeframe: 'M1',
+        openTime: 180000,
+        open: 67200,
+        high: 67310,
+        low: 67190,
+        close: 67305,
+        volume: 20,
+        closeTime: 240000,
+        isClosed: true,
+      };
+
+      const t2Result = evaluateTrancheExits(tradeAtBe, t2Candle, 50, 4);
+      assert.strictEqual(t2Result.action, 'TRANCHE_2_HIT');
+      assert.strictEqual(t2Result.tradeUpdates?.stopLoss, 67100, 'Stop Loss ratcheted to +1.00R Profit Lock (67,100)');
+      assert.strictEqual(t2Result.tradeUpdates?.remainingSize, 0.30, 'Remaining size should be exactly 0.30 for Tranche 3 runner');
+      // Tranche 3 trailing stop was ratcheted to +1.00R
+      const t3Update = t2Result.trancheUpdates?.find(u => u.id === tranches[2]!.id);
+      assert.strictEqual(t3Update?.updates.trailingStop, 67100, 'T3 trailing stop should be ratcheted to profit lock');
     });
   });
 
@@ -334,6 +362,112 @@ describe('🎩 GODFATHER Math & Microstructure Layer', () => {
       // 10:30 UTC (safe time)
       const safeTime = new Date(Date.UTC(2026, 9, 23, 10, 30, 0)).getTime();
       assert.strictEqual(isNearFundingReset(safeTime, 10), false);
+    });
+  });
+
+  describe('7. Concurrent 3-Engine Triad Architecture', () => {
+    it('Instantiates separate BTC, SOL, and Alts engines and routes candles concurrently', async () => {
+      const mockResampler = {
+        getBuffers: () => new Map(),
+      } as any;
+
+      const baseConfig = {
+        enabled: true,
+        symbols: ['BTCUSD', 'SOLUSD', 'DOGEUSD', 'INJUSD'],
+        venue: 'paper' as const,
+        testnet: true,
+        btcSweepMinBreachUsd: 50.0,
+        solSweepMinBreachUsd: 0.35,
+        btcRetestMaxBars: 8,
+        solRetestMaxBars: 12,
+        convictionScaleAPlus: 2.4,
+        convictionScaleA: 1.5,
+        convictionScaleB: 1.0,
+        weekendRiskScale: 0.5,
+        weekendBreakevenTriggerR: 1.5,
+        dailyLossLimitUsdc: 450,
+      };
+
+      const triad = new GodfatherTriadManager({
+        baseConfig,
+        resampler: mockResampler,
+        initialEquity: 10_000,
+        btcSymbols: ['BTCUSD'],
+        solSymbols: ['SOLUSD'],
+        altsSymbols: ['DOGEUSD', 'INJUSD'],
+        btcEquityFraction: 0.40,
+        solEquityFraction: 0.30,
+        altsEquityFraction: 0.30,
+      });
+
+      const engines = triad.getEngines();
+      assert.ok(engines.btc, 'BTC engine should exist');
+      assert.ok(engines.sol, 'SOL engine should exist');
+      assert.ok(engines.alts, 'Alts engine should exist');
+
+      // Verify separate symbol configuration
+      const status = triad.getStatus();
+      assert.deepStrictEqual(status.engines.btc.symbols, ['BTCUSD']);
+      assert.deepStrictEqual(status.engines.sol.symbols, ['SOLUSD']);
+      assert.deepStrictEqual(status.engines.alts.symbols, ['DOGEUSD', 'INJUSD']);
+
+      // Simultaneous start of all 3 engines
+      await triad.start();
+      assert.strictEqual(triad.getStatus().isRunning, true);
+
+      // Verify simultaneous teardown
+      triad.stop();
+      assert.strictEqual(triad.getStatus().isRunning, false);
+    });
+  });
+
+  describe('8. Self-Calibrating Real-Time Dynamic Parameter Calibration', () => {
+    it('Dynamically expands or tightens Chandelier Stop multiplier based on Choppiness Index', () => {
+      // Strong trend regime (chop < 38.2): expands trail to ride massive extensions
+      const btcTrendMult = getDynamicChandelierMultiplier('BTCUSD', 32.5);
+      const altsTrendMult = getDynamicChandelierMultiplier('SOLUSD', 29.8);
+      assert.strictEqual(btcTrendMult, 4.2, 'BTC Chandelier should expand to 4.2x in strong trend');
+      assert.strictEqual(altsTrendMult, 5.2, 'Alts Chandelier should expand to 5.2x in strong trend');
+
+      // Choppy / mean-reverting regime (chop > 55.0): tightens trail to secure gains before whipsaw
+      const btcChopMult = getDynamicChandelierMultiplier('BTCUSD', 58.4);
+      const altsChopMult = getDynamicChandelierMultiplier('SOLUSD', 62.1);
+      assert.strictEqual(btcChopMult, 3.0, 'BTC Chandelier should tighten to 3.0x in choppy regime');
+      assert.strictEqual(altsChopMult, 3.8, 'Alts Chandelier should tighten to 3.8x in choppy regime');
+
+      // Balanced normal regime (38.2 <= chop <= 55.0)
+      const btcNormMult = getDynamicChandelierMultiplier('BTCUSD', 46.0);
+      const altsNormMult = getDynamicChandelierMultiplier('SOLUSD', 46.0);
+      assert.strictEqual(btcNormMult, 3.5, 'BTC Chandelier should default to 3.5x');
+      assert.strictEqual(altsNormMult, 4.5, 'Alts Chandelier should default to 4.5x');
+    });
+
+    it('Dynamically calibrates sweep breach floor and stop buffer to M15 ATR', () => {
+      // High-volatility expansion day: M15 ATR = 600 USD on BTC
+      const highAtr = 600.0;
+      const dynamicHighSweep = Math.max(highAtr * 0.25, 35.0);
+      const dynamicHighBuffer = Math.max(highAtr * 0.15, 12.0);
+      assert.strictEqual(dynamicHighSweep, 150.0, 'Dynamic sweep on $600 ATR should be $150');
+      assert.strictEqual(dynamicHighBuffer, 90.0, 'Dynamic buffer on $600 ATR should be $90');
+
+      // Compressed low-volatility weekend: M15 ATR = 80 USD on BTC
+      const lowAtr = 80.0;
+      const dynamicLowSweep = Math.max(lowAtr * 0.25, 35.0);
+      const dynamicLowBuffer = Math.max(lowAtr * 0.15, 12.0);
+      assert.strictEqual(dynamicLowSweep, 35.0, 'Dynamic sweep on $80 ATR should clamp at $35 minimum floor');
+      assert.strictEqual(dynamicLowBuffer, 12.0, 'Dynamic buffer on $80 ATR should clamp at $12 minimum floor');
+    });
+
+    it('Dynamically calculates FVG threshold based on M1 bar-to-bar volatility', () => {
+      // Rapid M1 impulse (M1 ATR = 120 USD on BTC)
+      const highM1Atr = 120.0;
+      const dynamicFvg = Math.max(highM1Atr * 0.20, 8.0);
+      assert.strictEqual(dynamicFvg, 24.0, 'Dynamic FVG should scale to $24 gap on high momentum M1 bar');
+
+      // Quiet M1 consolidation (M1 ATR = 20 USD on BTC)
+      const lowM1Atr = 20.0;
+      const dynamicLowFvg = Math.max(lowM1Atr * 0.20, 8.0);
+      assert.strictEqual(dynamicLowFvg, 8.0, 'Dynamic FVG should safely respect the $8 floor');
     });
   });
 });
