@@ -1,7 +1,7 @@
-# 🎩 THE GODFATHER & SOLANA MEV ARBITRAGE BOT
+# 🎯 CRYPTO SNIPER & SOLANA MEV ARBITRAGE BOT
 ## Institutional Dual-Engine Quantitative Fund Architecture
 
-> **Dual-Engine High-Frequency & Directional Trading System**: High-speed, atomic cross-DEX MEV arbitrage on Solana alongside **The GODFATHER** quantitative smart money concepts (SMC) & liquidation cascade scalper for **BTCUSD & SOLUSD**—powered by Hyperliquid L1, Bybit V5, Yellowstone gRPC, and Jito Bundles in a unified TypeScript monorepo.
+> **Dual-Engine High-Frequency & Directional Trading System**: High-speed, atomic cross-DEX MEV arbitrage on Solana alongside **Crypto Sniper** quantitative smart money concepts (SMC) & liquidation cascade scalper for **BTCUSD, SOLUSD & Alts**—powered by Hyperliquid L1, Bybit V5, Yellowstone gRPC, and Jito Bundles in a unified TypeScript monorepo.
 
 [![Solana](https://img.shields.io/badge/Solana-9945FF?style=for-the-badge&logo=solana&logoColor=white)](https://solana.com/)
 [![Hyperliquid](https://img.shields.io/badge/Hyperliquid-L1_DEX-00FFA3?style=for-the-badge)](https://hyperliquid.xyz/)
@@ -20,7 +20,7 @@ This repository houses a **production-grade quantitative crypto trading fund** f
 +----------------------------------------------------------------------------------------------------+
 |                                 DUAL-ENGINE QUANTITATIVE FUND                                      |
 +-------------------------------------------------+--------------------------------------------------+
-| ENGINE 1: SOLANA MEV ARBITRAGE                  | ENGINE 2: THE GODFATHER TRIAD (3 CONCURRENT)     |
+| ENGINE 1: SOLANA MEV ARBITRAGE                  | ENGINE 2: CRYPTO SNIPER TRIAD (3 CONCURRENT)     |
 +-------------------------------------------------+--------------------------------------------------+
 | • Market-Neutral High-Frequency Arbitrage       | • 3 Concurrent Dedicated Engines (BTC, SOL, Alts)|
 | • Raydium CLMM vs. Orca Whirlpool Pools         | • Ringfenced Capital: 40% BTC, 30% SOL, 30% Alts |
@@ -49,7 +49,7 @@ flowchart TB
     JitoExec["@mev-research/execution (MEV)<br/>(Atomic Jito Bundles + Dynamic Tips)"]
   end
 
-  subgraph Engine2 [Engine 2: The GODFATHER Triad Orchestrator]
+  subgraph Engine2 [Engine 2: Crypto Sniper Triad Orchestrator]
     TriadMgr["GodfatherTriadManager<br/>(Concurrent 3-Engine Orchestrator)"]
     subgraph ParallelEngines [Dedicated Parallel Execution]
       BtcEng["btcEngine (40% Capital)<br/>Microstructure & Dynamic Volatility"]
@@ -102,9 +102,9 @@ flowchart TB
 
 ---
 
-## ⚡ The GODFATHER Quantitative Engine
+## ⚡ Crypto Sniper Quantitative Engine
 
-The Godfather operates on the microstructural reality of **liquidation cascades, institutional stop sweeps, and order book absorption** rather than retail lagging indicators.
+Crypto Sniper operates on the microstructural reality of **liquidation cascades, institutional stop sweeps, and order book absorption** rather than retail lagging indicators.
 
 ### 1. The 5-Stage Trigger Sequence (Self-Calibrating & Zero Repainting)
 1. **Higher-Timeframe Liquidity Discovery**:
@@ -275,7 +275,7 @@ pnpm test
 
 ### 4. Starting the Dual Engine
 ```powershell
-# Terminal 1: Launch the dual orchestrator (MEV + The Godfather)
+# Terminal 1: Launch the dual orchestrator (MEV + Crypto Sniper)
 pnpm start
 
 # Terminal 2: Launch the Next.js 14 Dashboard
@@ -301,4 +301,4 @@ The bot enforces hard programmatic circuit breakers designed to satisfy strict i
 
 ## 📜 License
 
-MIT © 2026 MEV Research Lab & The Godfather Quantitative Fund
+MIT © 2026 MEV Research Lab & Crypto Sniper Quantitative Fund

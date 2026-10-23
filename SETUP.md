@@ -4,7 +4,7 @@ This guide walks you through setting up the institutional dual-engine quantitati
 
 **What we're building:** A dual-engine crypto trading fund system:
 1. **Engine 1 (Solana MEV Arbitrage)**: Watches Raydium CLMM, Orca Whirlpool, and OpenBook on Solana, detects price mispricings via Yellowstone Geyser gRPC, and executes atomic, zero-capital-risk back-run arbitrage bundles via the Jito Block Engine.
-2. **Engine 2 (The GODFATHER Triad Scalper)**: Institutional Price-Action & Microstructure scalping system running 3 dedicated concurrent engines in parallel via `GodfatherTriadManager`: **Bitcoin ($BTCUSD$)** (40% capital anchor), **Solana ($SOLUSD$)** (30% high-beta runner), and **Alts Winners Basket ($ETHUSD$, $AVAXUSD$, $NEARUSD$, $LINKUSD$)** (30% momentum runner), utilizing a 100% self-calibrating dynamic 5-stage confluence trigger with 3-tranche execution across **Hyperliquid L1** (primary native DEX) and **Bybit V5** (secondary CEX fallback).
+2. **Engine 2 (The Crypto Sniper Triad Scalper)**: Institutional Price-Action & Microstructure scalping system running 3 dedicated concurrent engines in parallel via `GodfatherTriadManager`: **Bitcoin ($BTCUSD$)** (40% capital anchor), **Solana ($SOLUSD$)** (30% high-beta runner), and **Alts Winners Basket ($ETHUSD$, $AVAXUSD$, $NEARUSD$, $LINKUSD$)** (30% momentum runner), utilizing a 100% self-calibrating dynamic 5-stage confluence trigger with 3-tranche execution across **Hyperliquid L1** (primary native DEX) and **Bybit V5** (secondary CEX fallback).
 
 **Important:** This project does **not** use Docker for native development. You install PostgreSQL and Redis directly on your machine for maximum sub-millisecond execution performance.
 
@@ -292,7 +292,7 @@ COMPETITION_LEVEL=medium
 
 ---
 
-#### 5. THE GODFATHER Directional Engine Settings (Engine 2)
+#### 5. Crypto Sniper Directional Engine Settings (Engine 2)
 
 ```env
 DIRECTIONAL_ENABLED=true
@@ -469,8 +469,8 @@ You should see both engines initializing cleanly in your terminal:
 [STARTUP] Market feed active (Yellowstone Geyser gRPC)
 [SimRunner] MEV Simulation engine running
 
-[Godfather] ========================================
-[Godfather] THE GODFATHER Triad Concurrent Engine v2.0
+[CryptoSniper] ========================================
+[CryptoSniper] Crypto Sniper Triad Concurrent Engine v2.0
 [Godfather] Primary Venue: Hyperliquid L1 (Testnet: true)
 [Godfather] Secondary Venue: Bybit V5 (UTA Fallback)
 [Godfather] Concurrent Triad:
@@ -577,7 +577,7 @@ With the bot running, stare at Terminal 1 for a few minutes. You will see both e
 [SpreadEngine] Opportunity: SOL/USDC | net 25.3bps | confidence 72 | latency 2ms
 ```
 
-**Engine 2 (The GODFATHER Directional Scalper):**
+**Engine 2 (The Crypto Sniper Directional Scalper):**
 ```
 [Godfather] [BTCUSD] M15 Liquidity Sweep: Breach +$62.40 > $50.00 min threshold!
 [Godfather] [BTCUSD] Delta Absorption detected: Reclaim delta +42.1 BTC > Sweep delta -38.5 BTC
@@ -625,7 +625,7 @@ In `.env`, update to production settings:
 # Engine 1 Live MEV
 SIMULATION_MODE=false
 
-# Engine 2 Live Godfather
+# Engine 2 Live Crypto Sniper
 DIRECTIONAL_TESTNET=false
 DIRECTIONAL_VENUE=hyperliquid  # or bybit
 ```

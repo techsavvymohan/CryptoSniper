@@ -1,5 +1,5 @@
 # THE INSTITUTIONAL DUAL-ENGINE CRYPTO HANDBOOK
-## The Mathematical, Microstructural & Algorithmic Blueprint of the BTCUSD & SOLUSD GODFATHER Bot
+## The Mathematical, Microstructural & Algorithmic Blueprint of the Crypto Sniper Bot
 
 ---
 
@@ -89,7 +89,7 @@ Cryptocurrency markets operate under structural characteristics radically differ
 
 When a retail trader spots a "support level" on Bitcoin at $68,000 and enters long with a stop-loss at $67,750, they have not established an investment thesis; **they have broadcasted an unhedged cluster of Market Sell Orders directly into the liquidity pool**. Market makers deliberately absorb bids, sweep the price down to $67,700 to trigger those stops and liquidate retail margin, fill their own massive institutional long inventory at a wholesale discount, and reverse the market within 3 M1 bars.
 
-The **Institutional BTCUSD & SOLUSD GODFATHER Bot** was engineered to abandon retail delusions completely and trade exclusively on the **mechanical reality of institutional order flow, delta absorption, and liquidation cascades**.
+The **Institutional Crypto Sniper Bot** was engineered to abandon retail delusions completely and trade exclusively on the **mechanical reality of institutional order flow, delta absorption, and liquidation cascades**.
 
 ---
 
@@ -177,7 +177,7 @@ Because crypto operates 24 hours a day, 365 days a year without official market 
 Market makers continuously manage inventory risk (Stoll Model) and adverse selection (Glosten-Milgrom Model). When informed institutional flow begins lifting asks or dumping into bids:
 - Market makers pull passive limit quotes, widening the bid-ask spread.
 - They skew their prices to force incoming aggressive flow to trade at unfavorable fills.
-The GODFATHER Bot detects this inventory withdrawal via **Tick Delta Divergence**: if price makes a new extreme but volume delta drops, market makers have stepped out of the way, setting up an imminent sweep reversal.
+The Crypto Sniper Bot detects this inventory withdrawal via **Tick Delta Divergence**: if price makes a new extreme but volume delta drops, market makers have stepped out of the way, setting up an imminent sweep reversal.
 
 ### 2.3 The Stop-Loss & Forced Liquidation Clustering Phenomenon
 In retail crypto trading, leverage creates two identical order types clustered at swing points:
@@ -488,7 +488,7 @@ Federal Reserve interest rate decisions, US Consumer Price Index (CPI), and Non-
 +-----------------------------------------------------------------------------------------------------------------------+
 |                                12-FACTOR INSTITUTIONAL SYSTEM COMPARISON MATRIX                                       |
 +-----------------------------------+-----------------------+-----------------------+-----------------------------------+
-| EVALUATION CRITERION              | RETAIL GRID / MARTI   | YOUTUBE SMC SCRIPT    | INSTITUTIONAL BTC/SOL GODFATHER BOT |
+| EVALUATION CRITERION              | RETAIL GRID / MARTI   | YOUTUBE SMC SCRIPT    | INSTITUTIONAL CRYPTO SNIPER BOT     |
 +-----------------------------------+-----------------------+-----------------------+-----------------------------------+
 | 1. Mathematical Risk Model        | Negative Expectancy   | Flat 1% Risk          | Fractional Kelly (0.50x - 2.40x)  |
 | 2. Stop-Loss Discipline           | None (or -50% blowout)| Fixed Dollar Distance | Structural Anchor at Sweep Extreme|
@@ -675,7 +675,7 @@ MAX_TRADE_CAPITAL_USDC=50
 JITO_TIP_RATIO=0.30
 COMPETITION_LEVEL=medium
 
-# Engine 2: THE GODFATHER Directional Scalper Configuration
+# Engine 2: Crypto Sniper Directional Scalper Configuration
 DIRECTIONAL_ENABLED=true
 DIRECTIONAL_VENUE=hyperliquid         # Options: hyperliquid | bybit | paper
 DIRECTIONAL_TESTNET=false
@@ -758,7 +758,7 @@ pnpm dev
 
 During execution:
 - **Engine 1 (Solana MEV)** streams pool account states via Yellowstone Geyser gRPC, identifies cross-pool CLMM dislocations, and dispatches atomic swap bundles directly to Jito Block Engine validators with dynamic tip escalation.
-- **Engine 2 (The GODFATHER Triad Scalper)** executes 3 specialized concurrent engines in parallel (`btcEngine`, `solEngine`, `altsEngine`), causal-resamples live trade streams into M1, M5, M15, H1, and H4 candles, monitors 5-stage confluence (dynamic ATR-scaled BSL/SSL Fractal Sweep, Tick Delta Absorption, Displacement Body $\ge 0.60\times\text{ATR}$, MSS, and FVG Retest), calculates Fractional Kelly sizing (Unicorn 2.40x / Normal 1.00x), and routes Post-Only limit orders to **Hyperliquid L1** (capturing negative maker fee rebates) or **Bybit V5** (managing 3 server-side conditional exit tranches: 35% @ 1.5R, 35% @ Dynamic R2, and 30% Moonbag runner).
+- **Engine 2 (The Crypto Sniper Triad Scalper)** executes 3 specialized concurrent engines in parallel (`btcEngine`, `solEngine`, `altsEngine`), causal-resamples live trade streams into M1, M5, M15, H1, and H4 candles, monitors 5-stage confluence (dynamic ATR-scaled BSL/SSL Fractal Sweep, Tick Delta Absorption, Displacement Body $\ge 0.60\times\text{ATR}$, MSS, and FVG Retest), calculates Fractional Kelly sizing (Unicorn 2.40x / Normal 1.00x), and routes Post-Only limit orders to **Hyperliquid L1** (capturing negative maker fee rebates) or **Bybit V5** (managing 3 server-side conditional exit tranches: 35% @ 1.5R, 35% @ Dynamic R2, and 30% Moonbag runner).
 
 ---
 

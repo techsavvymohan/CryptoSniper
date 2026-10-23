@@ -1,11 +1,11 @@
-# 🎩 GODFATHER - Complete Crypto Manual Trading Strategy & Risk Blueprint
-### *Ek Complete, In-Depth Guide: Algorithm aur Bot ki Mathematical Strategy ko Bitcoin (BTCUSD) aur Solana (SOLUSD) ke Manual Trader ki Tarah Kaise Samjhein aur Trade Karein*
+# 🎯 Crypto Sniper - Complete Crypto Manual Trading Strategy & Risk Blueprint
+### *Ek Complete, In-Depth Guide: Algorithm aur Bot ki Mathematical Strategy ko Bitcoin (BTCUSD), Solana (SOLUSD) aur Alts ke Manual Trader ki Tarah Kaise Samjhein aur Trade Karein*
 
 ---
 
 ## 📌 Introduction (Yeh Guide Kiske Liye Hai?)
 
-Yeh document **GODFATHER** algo bot ki complete core strategy, crypto market microstructure logic, liquidation cascade mechanics, risk management, aur order execution ko aasan aur detailed **Hinglish** mein explain karta hai.
+Yeh document **Crypto Sniper** algo bot ki complete core strategy, crypto market microstructure logic, liquidation cascade mechanics, risk management, aur order execution ko aasan aur detailed **Hinglish** mein explain karta hai.
 
 Agar aap **Bitcoin ($BTCUSD$)** aur **Solana ($SOLUSD$)** ke ek **Manual Trader** hain jisko Python/TypeScript code ya algorithmic programming nahi aati, lekin aap yeh samajhna chahte hain ki:
 1. Yeh bot crypto market mein high-probability entries aur exits kaise plan karta hai?
@@ -17,15 +17,15 @@ Toh yeh master guide aapko step-by-step sab kuch mathematically aur practically 
 
 ---
 
-## 🏛️ Strategy ka Core Concept: "The Three Pillars of The Godfather"
+## 🏛️ Strategy ka Core Concept: "The Three Pillars of Crypto Sniper"
 
 Retail crypto traders aam taur par lagging indicators (RSI overbought/oversold, MACD crossover, ya normal support/resistance trendlines) par trade karte hain aur high leverage (10x–50x) ki wajah se liquidation wicks mein hunt ho jaate hain.
 
-GODFATHER kisi single indicator par trade nahi karta. Yeh **3-Tier Hierarchy** follow karta hai jise **"The Three Pillars"** kaha gaya hai:
+Crypto Sniper kisi single indicator par trade nahi karta. Yeh **3-Tier Hierarchy** follow karta hai jise **"The Three Pillars"** kaha gaya hai:
 
 ```
                   +----------------------------------------------+
-                  |        THE THREE PILLARS OF GODFATHER        |
+                  |       THE THREE PILLARS OF CRYPTO SNIPER     |
                   +----------------------------------------------+
                                          │
          ┌───────────────────────────────┼───────────────────────────────┐
@@ -190,7 +190,7 @@ Aaiye in 5 stages ko detail mein samjhein:
 
 ## 💰 Step 5: Master Risk Management Blueprint for Crypto
 
-Crypto market ki high volatility mein bina strict mathematical risk management ke account blow-up hona 100% tay hota hai. GODFATHER institutional risk parameters follow karta hai:
+Crypto market ki high volatility mein bina strict mathematical risk management ke account blow-up hona 100% tay hota hai. Crypto Sniper institutional risk parameters follow karta hai:
 
 ### 1. Risk Per Trade & Account Modes
 * **Prop Firm Mode (Crypto Funded Accounts)**:
@@ -257,9 +257,9 @@ Bot ke andar 3 hard-coded emergency switches hain:
 
 ## 🎯 Step 6: Order Management & 3-Tranche Profit Harvesting
 
-GODFATHER ka sabse bada edge uska **In-Trade Liquidity Harvesting System** hai. Retail traders profit aane par exit nahi karte aur market reverse hone par regret karte hain.
+Crypto Sniper ka sabse bada edge uska **In-Trade Liquidity Harvesting System** hai. Retail traders profit aane par exit nahi karte aur market reverse hone par regret karte hain.
 
-GODFATHER har crypto trade ko **3 Parts (Tranches)** mein divide karke manage karta hai:
+Crypto Sniper har crypto trade ko **3 Parts (Tranches)** mein divide karke manage karta hai:
 
 ```
  Entry Price (100% Volume)
@@ -429,6 +429,6 @@ Agar aap is system ko manually charts par execute karna chahte hain, toh har tra
 ---
 
 <div align="center">
-<b>THE GODFATHER Crypto Strategy Blueprint</b><br>
+<b>CRYPTO SNIPER Strategy Blueprint</b><br>
 <i>Mathematical Discipline • Liquidation Microstructure • Zero Emotional Trading</i>
 </div>

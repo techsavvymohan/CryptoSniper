@@ -48,7 +48,7 @@ pnpm -r build
 
 ### Step 5: Launch Orchestrator & Dashboard
 ```powershell
-# Terminal 1: Launch Core Orchestrator (Solana MEV + Godfather Triad Manager)
+# Terminal 1: Launch Core Orchestrator (Solana MEV + Crypto Sniper Triad Manager)
 pnpm start
 
 # Terminal 2: Launch Monitoring Dashboard
