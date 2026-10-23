@@ -85,7 +85,9 @@ export function loadConfig(): AppConfig {
     logLevel: process.env['LOG_LEVEL'] ?? 'info',
     godfather: {
       enabled: process.env['GODFATHER_ENABLED'] !== 'false',
-      symbols: process.env['GODFATHER_SYMBOLS'] ? process.env['GODFATHER_SYMBOLS'].split(',') : ['BTCUSD', 'SOLUSD'],
+      symbols: process.env['GODFATHER_SYMBOLS']
+        ? process.env['GODFATHER_SYMBOLS'].split(',')
+        : ['BTCUSD', 'ETHUSD', 'SOLUSD', 'DOGEUSD', 'SUIUSD', 'AVAXUSD', 'NEARUSD', 'LINKUSD', 'APTUSD', 'ARBUSD', 'OPUSD', 'WIFUSD', 'PEPEUSD', 'TIAUSD', 'INJUSD'],
       venue: (process.env['DIRECTIONAL_VENUE'] as 'hyperliquid' | 'bybit' | 'paper') ?? 'paper',
       testnet: process.env['DIRECTIONAL_TESTNET'] !== 'false',
       hyperliquid: {
@@ -97,10 +99,10 @@ export function loadConfig(): AppConfig {
         apiSecret: process.env['BYBIT_API_SECRET'],
       },
       btcSweepMinBreachUsd: process.env['BTC_SWEEP_MIN_BREACH_USD'] ? parseFloat(process.env['BTC_SWEEP_MIN_BREACH_USD']) : 50.0,
-      solSweepMinBreachUsd: process.env['SOL_SWEEP_MIN_BREACH_USD'] ? parseFloat(process.env['SOL_SWEEP_MIN_BREACH_USD']) : 0.50,
+      solSweepMinBreachUsd: process.env['SOL_SWEEP_MIN_BREACH_USD'] ? parseFloat(process.env['SOL_SWEEP_MIN_BREACH_USD']) : 0.35,
       btcRetestMaxBars: process.env['BTC_RETEST_MAX_BARS'] ? parseInt(process.env['BTC_RETEST_MAX_BARS'], 10) : 8,
       solRetestMaxBars: process.env['SOL_RETEST_MAX_BARS'] ? parseInt(process.env['SOL_RETEST_MAX_BARS'], 10) : 15,
-      convictionScaleAPlus: process.env['CONVICTION_SCALE_A_PLUS'] ? parseFloat(process.env['CONVICTION_SCALE_A_PLUS']) : 2.40,
+      convictionScaleAPlus: process.env['CONVICTION_SCALE_A_PLUS'] ? parseFloat(process.env['CONVICTION_SCALE_A_PLUS']) : 1.25,
       convictionScaleA: process.env['CONVICTION_SCALE_A'] ? parseFloat(process.env['CONVICTION_SCALE_A']) : 1.00,
       convictionScaleB: process.env['CONVICTION_SCALE_B'] ? parseFloat(process.env['CONVICTION_SCALE_B']) : 0.50,
       weekendRiskScale: process.env['WEEKEND_RISK_SCALE'] ? parseFloat(process.env['WEEKEND_RISK_SCALE']) : 0.50,

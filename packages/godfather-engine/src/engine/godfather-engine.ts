@@ -318,6 +318,12 @@ export class GodfatherEngine extends EventEmitter {
     );
     if (hasActiveTrade || hasPendingSignal) return;
 
+    // Portfolio Risk Guard: Max 5 concurrent open positions across universe
+    const activeCount = Array.from(this.activeTrades.values()).filter(
+      v => v.trade.status === 'OPEN',
+    ).length;
+    if (activeCount >= 5) return;
+
     // Check circuit breaker: Daily loss limit
     if (this.repository) {
       try {
@@ -354,6 +360,9 @@ export class GodfatherEngine extends EventEmitter {
     }
 
     // ATR calculation for displacement
+    const m15AtrSeries = calculateWilderATR(m15Bars, 14);
+    const m15Atr = m15AtrSeries.length > 0 ? m15AtrSeries[m15AtrSeries.length - 1]! : 0;
+
     const m1AtrSeries = calculateWilderATR(m1Bars, 14);
     const m1Atr = m1AtrSeries.length > 0 ? m1AtrSeries[m1AtrSeries.length - 1]! : 0;
     if (m1Atr <= 0) return;
@@ -375,11 +384,15 @@ export class GodfatherEngine extends EventEmitter {
     const { bsl, ssl } = detectM15Fractals(m15Bars, 20);
 
     const isBtc = symbol.toUpperCase().includes('BTC');
+    const isSol = symbol.toUpperCase().includes('SOL');
     const minSweepBreachUsd = isBtc
       ? this.config.btcSweepMinBreachUsd
-      : this.config.solSweepMinBreachUsd;
+      : isSol
+      ? this.config.solSweepMinBreachUsd
+      : Math.max(m15Atr * 0.35, currentM1.close * 0.0005);
 
-    const minFvgGapUsd = isBtc ? 10.0 : 0.10;
+    const minFvgGapUsd = isBtc ? 10.0 : isSol ? 0.10 : Math.max(m15Atr * 0.05, currentM1.close * 0.0001);
+    const buffer = isBtc ? 15.0 : isSol ? 0.20 : Math.max(m15Atr * 0.10, currentM1.close * 0.0002);
 
     // ==========================================
     // 1. EVALUATE BULLISH SETUP (Sweep of SSL)
@@ -399,7 +412,6 @@ export class GodfatherEngine extends EventEmitter {
           const isAPlus = deltaAbsorbed && sessionInfo.isHighVolumeWindow && h1Trend !== 'BEARISH';
           const grade: SignalGrade = isAPlus ? 'A_PLUS' : 'A';
 
-          const buffer = isBtc ? 15.0 : 0.20;
           const stopLoss = sweep.sweepCandle.low - buffer;
           const entryPrice = fvg.top; // Enter at FVG proximal edge
 
@@ -441,7 +453,6 @@ export class GodfatherEngine extends EventEmitter {
           const isAPlus = deltaAbsorbed && sessionInfo.isHighVolumeWindow && h1Trend !== 'BULLISH';
           const grade: SignalGrade = isAPlus ? 'A_PLUS' : 'A';
 
-          const buffer = isBtc ? 15.0 : 0.20;
           const stopLoss = sweep.sweepCandle.high + buffer;
           const entryPrice = fvg.bottom; // Enter at FVG proximal edge
 

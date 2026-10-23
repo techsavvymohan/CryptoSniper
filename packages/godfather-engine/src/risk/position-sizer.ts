@@ -110,8 +110,13 @@ export function calculateGodfatherPosition(params: PositionParams): PositionCalc
   const allocatedRiskUsd = baseRiskUsd * multiplier;
   const rawSize = allocatedRiskUsd / stopDistanceUsd;
 
-  // Round according to asset precision
-  const decimals = symbol.toUpperCase().includes('BTC') ? 4 : 2;
+  // Round according to asset precision dynamically based on asset price level
+  let decimals = 2;
+  if (entryPrice >= 10000) decimals = 4;
+  else if (entryPrice >= 100) decimals = 2;
+  else if (entryPrice >= 1) decimals = 1;
+  else decimals = 0;
+
   const positionSize = parseFloat(rawSize.toFixed(decimals));
 
   return {

@@ -62,17 +62,21 @@ export class CryptoCandleFeedService extends EventEmitter {
   }
 
   private mapSymbolToStream(symbol: string): string {
-    const s = symbol.toUpperCase();
-    if (s === 'BTCUSD' || s === 'BTCUSDT') return 'btcusdt';
-    if (s === 'SOLUSD' || s === 'SOLUSDT') return 'solusdt';
-    return s.toLowerCase();
+    let clean = symbol.toLowerCase().replace(/[-_]/g, '');
+    if (clean.endsWith('usd') && !clean.endsWith('usdt')) {
+      clean = clean.replace('usd', 'usdt');
+    } else if (!clean.endsWith('usdt')) {
+      clean = `${clean}usdt`;
+    }
+    return clean;
   }
 
   private mapStreamToStandardSymbol(stream: string): string {
-    const s = stream.toLowerCase();
-    if (s.includes('btcusdt') || s.includes('btcusd')) return 'BTCUSD';
-    if (s.includes('solusdt') || s.includes('solusd')) return 'SOLUSD';
-    return s.toUpperCase();
+    const clean = stream.toUpperCase();
+    if (clean.endsWith('USDT')) {
+      return clean.replace('USDT', 'USD');
+    }
+    return clean;
   }
 
   private async backfillRecentCandles(): Promise<void> {
